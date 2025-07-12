@@ -17,20 +17,19 @@ main_token = os.getenv("MAIN_TOKEN")
 main_token_2 = os.getenv("MAIN_TOKEN_2")
 main_token_3 = os.getenv("MAIN_TOKEN_3")
 tokens = os.getenv("TOKENS").split(",") if os.getenv("TOKENS") else []
-main_channel_id = "1386973916563767396"
-other_channel_id = "1387406577040101417"
-ktb_channel_id = "1376777071279214662"
-spam_channel_id = "1388802151723302912"
-work_channel_id = "1389250541590413363"
-daily_channel_id = "1392189578533671093"
-kvi_channel_id = "1312300543326031915"
+main_channel_id = "1392475912129220610"
+other_channel_id = "1392480064284655677"
+ktb_channel_id = "1392480085856092241"
+spam_channel_id = "1392480102687707176"
+work_channel_id = "1392480124905193562"
+daily_channel_id = "1392691415988830270"
+kvi_channel_id = "1392475912129220609"
 karuta_id = "646937666251915264"
 karibbit_id = "1274445226064220273"
 
 # --- BIẾN TRẠNG THÁI (đây là các giá trị mặc định nếu không có file settings.json) ---
 bots, acc_names = [], [
-    "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
-    "Ylang", "Nina", "Nathan", "Ofer", "White", "the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Token",
+    "accphu1","accphu2","accphu3","accphu4","accphu5","accphu6","accphu7","accphu8","accphu9","accphu10","accphu11","accphu12",
 ]
 main_bot, main_bot_2, main_bot_3 = None, None, None
 auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3 = False, False, False
@@ -1107,6 +1106,6 @@ if __name__ == "__main__":
         auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True)
         auto_reboot_thread.start()
     
-    port = int(os.environ.get("PORT", 10000))
+    port = int(os.environ.get("PORT", 8080))
     print(f"Khởi động Web Server tại http://0.0.0.0:{port}", flush=True)
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)

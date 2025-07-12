@@ -562,22 +562,46 @@ def spam_loop():
     while True:
         if spam_enabled and spam_message:
             last_spam_time = time.time()
+
+            # --- THAY ĐỔI: TẠO DANH SÁCH SPAM BAO GỒM TẤT CẢ ACC ---
+            bots_to_spam_with_names = []
+            # Thêm các tài khoản chính nếu chúng tồn tại
+            if main_bot:
+                bots_to_spam_with_names.append({'name': 'ALPHA NODE', 'bot': main_bot})
+            if main_bot_2:
+                bots_to_spam_with_names.append({'name': 'BETA NODE', 'bot': main_bot_2})
+            if main_bot_3:
+                bots_to_spam_with_names.append({'name': 'GAMMA NODE', 'bot': main_bot_3})
+
+            # Thêm các tài khoản phụ
             with bots_lock:
-                bots_to_spam = bots.copy()
-            for idx, bot in enumerate(bots_to_spam):
-                if not spam_enabled: break
-                try:
+                for idx, bot in enumerate(bots):
                     acc_name = acc_names[idx] if idx < len(acc_names) else f"Sub {idx+1}"
-                    bot.sendMessage(spam_channel_id, spam_message)
+                    bots_to_spam_with_names.append({'name': acc_name, 'bot': bot})
+            # --- KẾT THÚC THAY ĐỔI ---
+
+            # Bắt đầu vòng lặp spam qua tất cả các tài khoản đã thu thập
+            for item in bots_to_spam_with_names:
+                if not spam_enabled: 
+                    break # Dừng ngay nếu chức năng bị tắt
+                try:
+                    acc_name = item['name']
+                    bot_to_use = item['bot']
+                    
+                    bot_to_use.sendMessage(spam_channel_id, spam_message)
                     print(f"[{acc_name}] đã gửi: {spam_message}")
-                    time.sleep(2)
-                except Exception as e: print(f"Lỗi gửi spam từ [{acc_name}]: {e}")
+                    time.sleep(2)  # Delay nhỏ giữa mỗi tin nhắn để tránh bị Discord giới hạn
+                except Exception as e: 
+                    print(f"Lỗi gửi spam từ [{item.get('name', 'Unknown')}]: {e}")
             
-            print(f"[Spam] Chờ {spam_delay} giây cho lượt tiếp theo...")
-            start_wait = time.time()
-            while time.time() - start_wait < spam_delay:
-                if not spam_enabled: break
-                time.sleep(1)
+            # Nếu chức năng vẫn được bật sau khi spam hết một lượt
+            if spam_enabled:
+                print(f"[Spam] Chờ {spam_delay} giây cho lượt tiếp theo...")
+                start_wait = time.time()
+                while time.time() - start_wait < spam_delay:
+                    if not spam_enabled: 
+                        break # Cho phép dừng trong lúc đang chờ
+                    time.sleep(1)
         else:
             time.sleep(1)
 
@@ -870,7 +894,6 @@ HTML_TEMPLATE = """
             <div class="panel void-panel">
                 <h2><i class="fas fa-cogs"></i> Shadow Labor</h2>
 
-                <!-- AUTO WORK -->
                 <form method="post">
                     <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">AUTO WORK</h3>
                     <div class="input-group"><label>Node Delay</label><input type="number" name="work_delay_between_acc" value="{{ work_delay_between_acc }}"></div>
@@ -880,7 +903,6 @@ HTML_TEMPLATE = """
 
                 <hr style="border-color: var(--border-color); margin: 25px 0;">
 
-                <!-- AUTO DAILY -->
                 <form method="post">
                     <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">DAILY RITUAL</h3>
                     <div class="input-group"><label>Node Delay</label><input type="number" name="daily_delay_between_acc" value="{{ daily_delay_between_acc }}"></div>

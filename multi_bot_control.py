@@ -1,4 +1,4 @@
-# PHIÊN BẢN CUỐI CÙNG - HOÀN CHỈNH VÀ ỔN ĐỊNH - LƯU SETTINGS MỖI 60 PHÚT
+# PHIÊN BẢN CUỐI CÙNG - HOÀN CHỈNH VÀ ỔN ĐỊNH
 import discum
 import threading
 import time
@@ -17,19 +17,19 @@ main_token = os.getenv("MAIN_TOKEN")
 main_token_2 = os.getenv("MAIN_TOKEN_2")
 main_token_3 = os.getenv("MAIN_TOKEN_3")
 tokens = os.getenv("TOKENS").split(",") if os.getenv("TOKENS") else []
-main_channel_id = "1392475912129220610"
-other_channel_id = "1392480064284655677"
-ktb_channel_id = "1392480085856092241"
-spam_channel_id = "1392480102687707176"
-work_channel_id = "1392480124905193562"
-daily_channel_id = "1392691415988830270"
-kvi_channel_id = "1392475912129220609"
+main_channel_id = os.getenv("MAIN_CHANNEL_ID")
+other_channel_id = os.getenv("OTHER_CHANNEL_ID")
+ktb_channel_id = os.getenv("KTB_CHANNEL_ID")
+spam_channel_id = os.getenv("SPAM_CHANNEL_ID")
+work_channel_id = os.getenv("WORK_CHANNEL_ID")
+daily_channel_id = os.getenv("DAILY_CHANNEL_ID")
+kvi_channel_id = os.getenv("KVI_CHANNEL_ID")
 karuta_id = "646937666251915264"
 karibbit_id = "1274445226064220273"
 
 # --- BIẾN TRẠNG THÁI (đây là các giá trị mặc định nếu không có file settings.json) ---
 bots, acc_names = [], [
-    "accphu1","accphu2","accphu3","accphu4","accphu5","accphu6","accphu7","accphu8","accphu9","accphu10","accphu11","accphu12",
+   "accphu1","accphu2","accphu3","accphu4","accphu5","accphu6","accphu7","accphu8","accphu9","accphu10","accphu11","accphu12",
 ]
 main_bot, main_bot_2, main_bot_3 = None, None, None
 auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3 = False, False, False
@@ -37,12 +37,12 @@ heart_threshold, heart_threshold_2, heart_threshold_3 = 50, 50, 50
 spam_enabled, auto_work_enabled, auto_reboot_enabled = False, False, False
 spam_message, spam_delay, work_delay_between_acc, work_delay_after_all, auto_reboot_delay = "", 10, 10, 44100, 3600
 auto_daily_enabled = False
-daily_delay_after_all = 87000
+daily_delay_after_all = 87000 
 daily_delay_between_acc = 3
 auto_kvi_enabled = False
 kvi_click_count = 10
 kvi_click_delay = 3
-kvi_loop_delay = 7500
+kvi_loop_delay = 7500 
 
 # Timestamps - sẽ được load từ file
 last_work_cycle_time, last_daily_cycle_time, last_kvi_cycle_time, last_reboot_cycle_time, last_spam_time = 0, 0, 0, 0, 0
@@ -61,6 +61,7 @@ def save_settings():
     api_key = os.getenv("JSONBIN_API_KEY")
     bin_id = os.getenv("JSONBIN_BIN_ID")
     if not api_key or not bin_id:
+        # print("[Settings] Thiếu API Key hoặc Bin ID của JSONBin.", flush=True)
         return
 
     settings = {
@@ -113,11 +114,12 @@ def load_settings():
         req = requests.get(url, headers=headers, timeout=10)
         if req.status_code == 200:
             settings = req.json().get("record", {})
-            if settings:
+            if settings: # Chỉ load nếu bin không rỗng
                 globals().update(settings)
                 print("[Settings] Đã tải cài đặt từ JSONBin.io.", flush=True)
             else:
-                print("[Settings] JSONBin rỗng, bắt đầu với cài đặt mặc định.", flush=True)
+                print("[Settings] JSONBin rỗng, bắt đầu với cài đặt mặc định và lưu lại.", flush=True)
+                save_settings() # Lưu cài đặt mặc định lên bin lần đầu
         else:
             print(f"[Settings] Lỗi khi tải cài đặt từ JSONBin.io: {req.status_code} - {req.text}", flush=True)
     except Exception as e:
@@ -129,19 +131,19 @@ def reboot_bot(target_id):
     with bots_lock:
         print(f"[Reboot] Nhận được yêu cầu reboot cho target: {target_id}", flush=True)
         if target_id == 'main_1' and main_token:
-            try:
+            try: 
                 if main_bot: main_bot.gateway.close()
             except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 1: {e}", flush=True)
             main_bot = create_bot(main_token, is_main=True)
             print("[Reboot] Acc Chính 1 đã được khởi động lại.", flush=True)
         elif target_id == 'main_2' and main_token_2:
-            try:
+            try: 
                 if main_bot_2: main_bot_2.gateway.close()
             except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 2: {e}", flush=True)
             main_bot_2 = create_bot(main_token_2, is_main_2=True)
             print("[Reboot] Acc Chính 2 đã được khởi động lại.", flush=True)
         elif target_id == 'main_3' and main_token_3:
-            try:
+            try: 
                 if main_bot_3: main_bot_3.gateway.close()
             except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 3: {e}", flush=True)
             main_bot_3 = create_bot(main_token_3, is_main_3=True)
@@ -196,6 +198,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                         print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                         def grab():
                                             bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                            time.sleep(2) 
                                             bot.sendMessage(ktb_channel_id, "kt b")
                                         threading.Timer(delay, grab).start()
                                     break
@@ -225,6 +228,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                         print(f"[Bot 2] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                         def grab_2():
                                             bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                            time.sleep(2) 
                                             bot.sendMessage(ktb_channel_id, "kt b")
                                         threading.Timer(delay, grab_2).start()
                                     break
@@ -254,6 +258,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                         print(f"[Bot 3] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                         def grab_3():
                                             bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                            time.sleep(2) 
                                             bot.sendMessage(ktb_channel_id, "kt b")
                                         threading.Timer(delay, grab_3).start()
                                     break
@@ -301,7 +306,7 @@ def run_work_bot(token, acc_name):
         elif step["value"] == 2 and author_id == karuta_id and "components" in m:
             message_id = m["id"]; application_id = m.get("application_id", karuta_id)
             for comp in m["components"]:
-                 if comp["type"] == 1 and len(comp["components"]) >= 2:
+                 if comp["type"] == 1 and len(comp["components"]) >= 2:	
                     btn = comp["components"][1]; print(f"[Work][{acc_name}] Click nút thứ 2: {btn['custom_id']}", flush=True); click_tick(work_channel_id, message_id, btn["custom_id"], application_id, guild_id); step["value"] = 3; bot.gateway.close(); return
     print(f"[Work][{acc_name}] Bắt đầu...", flush=True); threading.Thread(target=bot.gateway.run, daemon=True).start(); time.sleep(3); send_karuta_command()
     timeout = time.time() + 90
@@ -361,14 +366,6 @@ def run_kvi_bot(token):
     bot.gateway.close(); print(f"[KVI] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
 
 # --- CÁC VÒNG LẶP NỀN (ĐÃ VIẾT LẠI CHO ỔN ĐỊNH) ---
-def timed_save_loop():
-    """Luồng này sẽ tự động lưu cài đặt mỗi 60 phút."""
-    while True:
-        # Chờ 60 phút (3600 giây)
-        time.sleep(3600)
-        print("[Settings] Đã đến giờ, tự động lưu cài đặt lên JSONBin.io...", flush=True)
-        save_settings()
-
 def auto_work_loop():
     global last_work_cycle_time
     while True:
@@ -388,7 +385,7 @@ def auto_work_loop():
                     print(f"[Work] Acc '{item['name']}' xong, chờ {work_delay_between_acc} giây...", flush=True); time.sleep(work_delay_between_acc)
                 if auto_work_enabled:
                     print(f"[Work] Hoàn thành chu kỳ.", flush=True)
-                    last_work_cycle_time = time.time()
+                    last_work_cycle_time = time.time();
             time.sleep(60)
         except Exception as e:
             print(f"[ERROR in auto_work_loop] {e}", flush=True); time.sleep(60)
@@ -409,7 +406,7 @@ def auto_daily_loop():
                     print(f"[Daily] Đang chạy acc '{item['name']}'...", flush=True); run_daily_bot(item['token'].strip(), item['name']); print(f"[Daily] Acc '{item['name']}' xong, chờ {daily_delay_between_acc} giây...", flush=True); time.sleep(daily_delay_between_acc)
                 if auto_daily_enabled:
                     print(f"[Daily] Hoàn thành chu kỳ.", flush=True)
-                    last_daily_cycle_time = time.time()
+                    last_daily_cycle_time = time.time();
             time.sleep(60)
         except Exception as e:
             print(f"[ERROR in auto_daily_loop] {e}", flush=True); time.sleep(60)
@@ -422,7 +419,7 @@ def auto_kvi_loop():
                 print("[KVI] Bắt đầu chu trình KVI cho Acc Chính 1...", flush=True)
                 run_kvi_bot(main_token)
                 if auto_kvi_enabled:
-                    last_kvi_cycle_time = time.time()
+                    last_kvi_cycle_time = time.time(); save_settings()
             time.sleep(60)
         except Exception as e:
             print(f"[ERROR in auto_kvi_loop] {e}", flush=True); time.sleep(60)
@@ -436,7 +433,7 @@ def auto_reboot_loop():
                 if main_bot: reboot_bot('main_1'); time.sleep(5)
                 if main_bot_2: reboot_bot('main_2'); time.sleep(5)
                 if main_bot_3: reboot_bot('main_3')
-                last_reboot_cycle_time = time.time()
+                last_reboot_cycle_time = time.time();
             interrupted = auto_reboot_stop_event.wait(timeout=60)
             if interrupted: break
         except Exception as e:
@@ -461,12 +458,20 @@ def spam_loop():
                         print(f"Lỗi gửi spam từ [{acc_name}]: {e}", flush=True)
                 if spam_enabled:
                     last_spam_time = time.time()
+
             time.sleep(1)
         except Exception as e:
             print(f"[ERROR in spam_loop] {e}", flush=True)
             time.sleep(1)
 
-
+def periodic_save_loop():
+    """Vòng lặp nền để tự động lưu cài đặt 5 phút một lần."""
+    while True:
+        time.sleep(600)
+        
+        print("[Settings] Bắt đầu lưu định kỳ...", flush=True)
+        save_settings()
+        
 app = Flask(__name__)
 
 # --- GIAO DIỆN WEB ---
@@ -574,7 +579,7 @@ HTML_TEMPLATE = """
                         <div class="status-row"><span class="status-label"><i class="fas fa-gem"></i> Auto KVI</span><div><span id="kvi-timer" class="timer-display">--:--:--</span> <span id="kvi-status-badge" class="status-badge inactive">OFF</span></div></div>
                         <div class="status-row"><span class="status-label"><i class="fas fa-broadcast-tower"></i> Auto Spam</span><div><span id="spam-timer" class="timer-display">--:--:--</span><span id="spam-status-badge" class="status-badge inactive">OFF</span></div></div>
                         <div class="status-row"><span class="status-label"><i class="fas fa-redo"></i> Auto Reboot</span><div><span id="reboot-timer" class="timer-display">--:--:--</span> <span id="reboot-status-badge" class="status-badge inactive">OFF</span></div></div>
-                        <div class="status-row"><span class="status-label"><i class="fas fa-server"></i> Deep Uptime</span><div><span id="uptime-timer" class="timer-display">--:--:--</span></div></div>
+                        <div class="status-row"><span class="status-label"><i class="fas fa-server"></i> Deep Uptime</span><div><span id="uptime-timer" class="timer-display">--:--:--</span></div></div> 
                     </div>
                     <div id="bot-status-list" class="bot-status-grid"></div>
                 </div>
@@ -600,7 +605,7 @@ HTML_TEMPLATE = """
                 </div>
             </div>
             
-             <div class="panel code-panel">
+            <div class="panel code-panel">
                 <h2 data-text="Code Injection"><i class="fas fa-code"></i> Code Injection</h2>
                 <div class="input-group"><label>Target</label><select id="inject-acc-index">{{ acc_options|safe }}</select></div>
                 <div class="input-group"><label>Prefix</label><input type="text" id="inject-prefix" placeholder="e.g. kt n"></div>
@@ -684,7 +689,7 @@ HTML_TEMPLATE = """
 
                 setTimeout(() => {
                     fetchStatus();
-                }, 1000);
+                }, 1000); // 1000ms = 1 giây
 
                 return result;
             } catch (error) {
@@ -742,7 +747,7 @@ HTML_TEMPLATE = """
                 updateElement('auto-kvi-toggle-btn', { textContent: `${data.ui_states.kvi_action} KVI`, className: `btn ${data.ui_states.kvi_button_class}` });
 
                 const listContainer = document.getElementById('bot-status-list');
-                listContainer.innerHTML = '';
+                listContainer.innerHTML = ''; 
                 const allBots = [...data.bot_statuses.main_bots, ...data.bot_statuses.sub_accounts];
                 allBots.forEach(bot => {
                     const item = document.createElement('div');
@@ -760,10 +765,12 @@ HTML_TEMPLATE = """
 
         // --- Event Listeners for Buttons ---
 
+        // Soul Harvest
         document.getElementById('harvest-toggle-1').addEventListener('click', () => postData('/api/harvest_toggle', { node: 1, threshold: document.getElementById('heart-threshold-1').value }));
         document.getElementById('harvest-toggle-2').addEventListener('click', () => postData('/api/harvest_toggle', { node: 2, threshold: document.getElementById('heart-threshold-2').value }));
         document.getElementById('harvest-toggle-3').addEventListener('click', () => postData('/api/harvest_toggle', { node: 3, threshold: document.getElementById('heart-threshold-3').value }));
         
+        // Manual Operations
         document.getElementById('send-manual-message-btn').addEventListener('click', () => {
             postData('/api/manual_ops', { message: document.getElementById('manual-message-input').value })
                 .then(() => {
@@ -776,6 +783,7 @@ HTML_TEMPLATE = """
             }
         });
 
+        // Code Injection
         document.getElementById('inject-codes-btn').addEventListener('click', () => {
             postData('/api/inject_codes', {
                 acc_index: document.getElementById('inject-acc-index').value,
@@ -788,6 +796,7 @@ HTML_TEMPLATE = """
             });
         });
 
+        // Shadow Labor
         document.getElementById('auto-work-toggle-btn').addEventListener('click', () => {
             postData('/api/labor_toggle', {
                 type: 'work',
@@ -803,6 +812,7 @@ HTML_TEMPLATE = """
             });
         });
 
+        // Shadow Resurrection
         document.getElementById('auto-reboot-toggle-btn').addEventListener('click', () => {
             postData('/api/reboot_toggle_auto', { delay: document.getElementById('auto-reboot-delay').value });
         });
@@ -815,6 +825,7 @@ HTML_TEMPLATE = """
             }
         });
         
+        // Shadow Broadcast
         document.getElementById('spam-toggle-btn').addEventListener('click', () => {
             postData('/api/broadcast_toggle', {
                 type: 'spam',
@@ -831,6 +842,7 @@ HTML_TEMPLATE = """
             });
         });
         
+        // Bot State Toggle (in status list)
         document.getElementById('bot-status-list').addEventListener('click', e => {
             if(e.target.matches('button[data-target]')) {
                 postData('/api/toggle_bot_state', { target: e.target.dataset.target });
@@ -845,6 +857,7 @@ HTML_TEMPLATE = """
 # --- FLASK ROUTES ---
 @app.route("/")
 def index():
+    # This function is now very simple. It just prepares the data for the initial render.
     grab_status, grab_text, grab_action, grab_button_class = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     grab_status_2, grab_text_2, grab_action_2, grab_button_class_2 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_2 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_3 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
@@ -893,7 +906,7 @@ def api_manual_ops():
     if msg_to_send:
         msg = f"Sent to slaves: {msg_to_send}"
         with bots_lock:
-            for idx, bot in enumerate(bots):
+            for idx, bot in enumerate(bots): 
                 if bot and bot_active_states.get(f'sub_{idx}', False):
                     threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg_to_send)).start()
     else: msg = "No message provided."
@@ -936,6 +949,7 @@ def api_labor_toggle():
         if auto_daily_enabled and last_daily_cycle_time == 0: last_daily_cycle_time = time.time() - daily_delay_after_all - 1
         daily_delay_between_acc = int(data.get('delay_between', 3)); daily_delay_after_all = int(data.get('delay_after', 87000))
         msg = f"Auto Daily {'ENABLED' if auto_daily_enabled else 'DISABLED'}."
+
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/api/reboot_manual", methods=['POST'])
@@ -977,6 +991,7 @@ def api_reboot_toggle_auto():
         if auto_reboot_stop_event: auto_reboot_stop_event.set()
         auto_reboot_thread = None
         msg = "Auto Reboot DISABLED."
+
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/api/broadcast_toggle", methods=['POST'])
@@ -997,6 +1012,7 @@ def api_broadcast_toggle():
         if auto_kvi_enabled and last_kvi_cycle_time == 0: last_kvi_cycle_time = time.time() - kvi_loop_delay - 1
         kvi_click_count, kvi_click_delay, kvi_loop_delay = int(data.get('clicks', 10)), int(data.get('click_delay', 3)), int(data.get('loop_delay', 7500))
         msg = f"Auto KVI {'ENABLED' if auto_kvi_enabled else 'DISABLED'}."
+
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/api/toggle_bot_state", methods=['POST'])
@@ -1008,6 +1024,7 @@ def api_toggle_bot_state():
         bot_active_states[target] = not bot_active_states[target]
         state_text = "AWAKENED" if bot_active_states[target] else "DORMANT"
         msg = f"Target {target.upper()} has been set to {state_text}."
+
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/status")
@@ -1060,18 +1077,21 @@ if __name__ == "__main__":
     load_settings()
     print("Đang khởi tạo các bot...", flush=True)
     with bots_lock:
-        if main_token:
+        if main_token: 
             main_bot = create_bot(main_token, is_main=True)
+            # THÊM KHỐI NÀY
             if 'main_1' not in bot_active_states:
                 bot_active_states['main_1'] = True
                 
-        if main_token_2:
+        if main_token_2: 
             main_bot_2 = create_bot(main_token_2, is_main_2=True)
+            # THÊM KHỐI NÀY
             if 'main_2' not in bot_active_states:
                 bot_active_states['main_2'] = True
                 
-        if main_token_3:
+        if main_token_3: 
             main_bot_3 = create_bot(main_token_3, is_main_3=True)
+            # THÊM KHỐI NÀY
             if 'main_3' not in bot_active_states:
                 bot_active_states['main_3'] = True
                 
@@ -1082,14 +1102,11 @@ if __name__ == "__main__":
                     bot_active_states[f'sub_{i}'] = True
 
     print("Đang khởi tạo các luồng nền...", flush=True)
-    
-    # Bắt đầu luồng lưu tự động mỗi 60 phút
-    threading.Thread(target=timed_save_loop, daemon=True).start()
-
     if spam_thread is None or not spam_thread.is_alive():
         spam_thread = threading.Thread(target=spam_loop, daemon=True)
         spam_thread.start()
-    
+
+    threading.Thread(target=periodic_save_loop, daemon=True).start()
     threading.Thread(target=auto_work_loop, daemon=True).start()
     threading.Thread(target=auto_daily_loop, daemon=True).start()
     threading.Thread(target=auto_kvi_loop, daemon=True).start()
@@ -1099,6 +1116,6 @@ if __name__ == "__main__":
         auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True)
         auto_reboot_thread.start()
     
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 10000))
     print(f"Khởi động Web Server tại http://0.0.0.0:{port}", flush=True)
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)

@@ -213,7 +213,7 @@ def process_karuta_drop(bot, last_drop_msg_id, channel_id, karibbit_id, ktb_chan
 
     print(f"[{bot_name}] Không tìm thấy hoặc xử lý được tin nhắn Karibbit sau nhiều lần thử.", flush=True)
     
-def create_bot(token, bot_number=0):  # 0 là giá trị mặc định cho các bot phụ
+def create_bot(token, bot_number=0):
     bot = discum.Client(token=token, log=False)
     @bot.gateway.command
     def on_ready(resp):
@@ -222,26 +222,30 @@ def create_bot(token, bot_number=0):  # 0 là giá trị mặc định cho các 
             if isinstance(user_data, dict):
                 user_id = user_data.get("id")
                 if user_id:
-                    # Xác định loại bot dựa trên bot_number
                     if bot_number == 1: bot_type = "(ALPHA)"
                     elif bot_number == 2: bot_type = "(BETA)"
                     elif bot_number == 3: bot_type = "(GAMMA)"
-                    else: bot_type = ""  # Bot phụ không có type
+                    else: bot_type = ""
                     print(f"Đã đăng nhập: {user_id} {bot_type}", flush=True)
 
-    # Hàm xử lý tin nhắn chung (giữ nguyên từ lần trước)
-    def on_message_handler(resp, enabled_flag_func, threshold_func, reaction_config, bot_name):
+    # Hàm xử lý tin nhắn chung, NAY ĐÃ NHẬN THÊM CÁC ID CẦN THIẾT
+    def on_message_handler(resp, enabled_flag_func, threshold_func, reaction_config, bot_name,
+                           # Thêm các tham số mới ở đây
+                           target_channel_id, target_author_id, kibbit_bot_id, burn_check_channel_id):
         if resp.event.message:
             msg = resp.parsed.auto()
-            if (msg.get("author", {}).get("id") == karuta_id and 
-                msg.get("channel_id") == main_channel_id and 
-                "is dropping" not in msg.get("content", "") and 
+            # Sử dụng các tham số mới thay vì biến global
+            if (msg.get("author", {}).get("id") == target_author_id and
+                msg.get("channel_id") == target_channel_id and
+                "is dropping" not in msg.get("content", "") and
                 not msg.get("mentions", []) and enabled_flag_func()):
-                
+
                 last_drop_msg_id = msg["id"]
                 threading.Thread(target=process_karuta_drop, args=(
-                    bot, last_drop_msg_id, main_channel_id, karibbit_id, 
-                    ktb_channel_id, threshold_func(), reaction_config, bot_name
+                    bot, last_drop_msg_id,
+                    # Truyền các tham số đã nhận vào hàm xử lý
+                    target_channel_id, kibbit_bot_id, burn_check_channel_id,
+                    threshold_func(), reaction_config, bot_name
                 )).start()
 
     # Cấu hình riêng cho từng bot chính
@@ -269,15 +273,21 @@ def create_bot(token, bot_number=0):  # 0 là giá trị mặc định cho các 
     # Nếu bot_number là của bot chính (1, 2, hoặc 3), thì gán hàm xử lý on_message
     if bot_number in main_bot_configs:
         config = main_bot_configs[bot_number]
-        
+
         @bot.gateway.command
         def on_message(resp):
-            on_message_handler(resp, 
-                               config["enabled_flag_func"], 
-                               config["threshold_func"], 
-                               config["reaction_config"], 
-                               config["bot_name"])
-    
+            # KHI GỌI, TRUYỀN CÁC BIẾN GLOBAL VÀO
+            on_message_handler(resp,
+                               config["enabled_flag_func"],
+                               config["threshold_func"],
+                               config["reaction_config"],
+                               config["bot_name"],
+                               # Các biến global được truyền vào đây
+                               main_channel_id,
+                               karuta_id,
+                               karibbit_id,
+                               ktb_channel_id)
+
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
 

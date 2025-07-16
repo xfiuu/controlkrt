@@ -148,57 +148,124 @@ def reboot_bot(target_id):
                     bots[index] = create_bot(token_to_reboot.strip())
                     print(f"[Reboot] Sub Bot {index} đã được khởi động lại.", flush=True)
             except (ValueError, IndexError) as e: print(f"[Reboot] Lỗi xử lý target Sub Bot: {e}", flush=True)
+                
+# --- HÀM XỬ LÝ NHẶT THẺ ĐÃ SỬA LỖI ---
+def process_karuta_drop(bot, last_drop_msg_id, channel_id, karibbit_id, ktb_channel_id, heart_threshold, reaction_config, bot_name):
+    """
+    Hàm xử lý logic nhặt thẻ Karuta một cách ổn định.
+    - bot: đối tượng bot discum.
+    - last_drop_msg_id: ID của tin nhắn drop.
+    - channel_id: ID kênh drop.
+    - karibbit_id: ID của bot Karibbit.
+    - ktb_channel_id: ID kênh để kiểm tra burn.
+    - heart_threshold: Ngưỡng tim tối thiểu để nhặt.
+    - reaction_config: Cấu hình reaction (emoji, delay).
+    - bot_name: Tên của bot để ghi log.
+    """
+    # Thử lại vài lần để đảm bảo không bỏ lỡ tin nhắn của Karibbit do trễ mạng
+    for i in range(4):  # Thử tối đa 4 lần
+        time.sleep(0.35 + i * 0.1)  # Chờ lâu hơn một chút sau mỗi lần thử
+        try:
+            messages = bot.getMessages(channel_id, num=5).json()
+            # Tìm tin nhắn từ Karibbit có chứa embed
+            karibbit_msg = next((msg for msg in messages if msg.get("author", {}).get("id") == karibbit_id and "embeds" in msg and msg["embeds"]), None)
 
-def create_bot(token, bot_number=None):
-    bot = discum.Client(token=token, log=False)
+            if karibbit_msg:
+                desc = karibbit_msg["embeds"][0].get("description", "")
+                lines = desc.split('\n')
+
+                # --- LOGIC PARSE TIM ĐÃ SỬA LỖI ---
+                heart_numbers = []
+                for line in lines[:3]: # Chỉ xử lý 3 dòng đầu
+                    num = 0
+                    try:
+                        # Tách các phần trong dấu ``. Ví dụ: ['#1', '🤍55', '✨123']
+                        parts = re.findall(r'`([^`]*)`', line)
+                        # Giá trị tim (wishlist) thường nằm ở phần tử thứ 2 (index 1)
+                        if len(parts) >= 2:
+                            # Tìm số bên trong chuỗi đó. Ví dụ: tìm '55' trong '🤍55'
+                            heart_match = re.search(r'\d+', parts[1])
+                            if heart_match:
+                                num = int(heart_match.group())
+                    except (IndexError, ValueError):
+                        # Bỏ qua nếu dòng không đúng định dạng hoặc không có số
+                        num = 0
+                    heart_numbers.append(num)
+                # --- KẾT THÚC SỬA LỖI ---
+
+                max_num = max(heart_numbers) if heart_numbers else 0
+                if sum(heart_numbers) > 0 and max_num >= heart_threshold:
+                    max_index = heart_numbers.index(max_num)
+                    emoji, delay = reaction_config[max_index]
+                    print(f"[{bot_name}] Tìm thấy! Dòng {max_index + 1} với {max_num} tim (yêu cầu >= {heart_threshold}). Nhặt với {emoji} sau {delay}s.", flush=True)
+
+                    def grab():
+                        bot.addReaction(channel_id, last_drop_msg_id, emoji)
+                        time.sleep(2)
+                        bot.sendMessage(ktb_channel_id, "kt b")
+                    threading.Timer(delay, grab).start()
+                else:
+                    print(f"[{bot_name}] Bỏ qua drop, tim cao nhất là {max_num} (yêu cầu >= {heart_threshold})", flush=True)
+                
+                return  # Đã xử lý xong, thoát khỏi vòng lặp và hàm
+        except Exception as e:
+            print(f"[{bot_name}] Lỗi khi đọc tin nhắn Karibbit lần thử {i + 1}: {e}", flush=True)
+
+    print(f"[{bot_name}] Không tìm thấy hoặc xử lý được tin nhắn Karibbit sau nhiều lần thử.", flush=True)
     
+def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
+    bot = discum.Client(token=token, log=False)
     @bot.gateway.command
     def on_ready(resp):
         if resp.event.ready:
-            user_id = resp.raw.get("user", {}).get("id")
-            if user_id:
-                bot_type = f"({main_bot_configs[bot_number]['name']})" if bot_number else ""
-                print(f"Đã đăng nhập: {user_id} {bot_type}", flush=True)
+            user_data = resp.raw.get("user")
+            if isinstance(user_data, dict):
+                user_id = user_data.get("id")
+                if user_id:
+                    if is_main: bot_type = "(ALPHA)"
+                    elif is_main_2: bot_type = "(BETA)"
+                    elif is_main_3: bot_type = "(GAMMA)"
+                    else: bot_type = ""
+                    print(f"Đã đăng nhập: {user_id} {bot_type}", flush=True)
 
-    def generic_on_message(bot_instance, channel_id, last_drop_id, heart_val, num, emoji_config):
-        try:
-            messages = bot_instance.getMessages(channel_id, num=5).json()
-            for msg_item in messages:
-                if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                    desc = msg_item["embeds"][0].get("description", "")
-                    lines = desc.split('\n')
-                    
-                    print(f"---[DEBUG LOG BOT {num} CHO DROP {last_drop_id}]---", flush=True)
-                    cleaned_desc = desc.replace('\n', ' ')
-                    print(f"  > [RAW DESC]: {cleaned_desc}", flush=True)
-                    
-                    heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
-                    print(f"  > [EXTRACTED HEARTS]: {heart_numbers}", flush=True)
-                    
-                    max_num = max(heart_numbers)
-                    print(f"  > [MAX HEART]: {max_num}", flush=True)
-                    
-                    if sum(heart_numbers) > 0 and max_num >= heart_val:
-                        max_index = heart_numbers.index(max_num)
-                        print(f"  > [MAX INDEX]: {max_index}", flush=True)
-                        
-                        emoji, delay = emoji_config[max_index]
-                        print(f"  > [DECISION]: GRAB - Vị trí {max_index+1} | Emoji {emoji} | Delay {delay}s.", flush=True)
-                        print("----------------------------------------------------", flush=True)
-                        
-                        def grab():
-                            bot_instance.addReaction(channel_id, last_drop_id, emoji)
-                            time.sleep(2)
-                            bot_instance.sendMessage(ktb_channel_id, "kt b")
-                        threading.Timer(delay, grab).start()
-                    else:
-                        print(f"  > [DECISION]: SKIP - Max heart ({max_num}) < Threshold ({heart_val}).", flush=True)
-                        print("----------------------------------------------------", flush=True)
-                    break
-        except Exception as e: 
-            print(f"---[DEBUG LOG BOT {num}]---", flush=True)
-            print(f"  > Lỗi nghiêm trọng trong hàm generic_on_message: {e}", flush=True)
-            print("----------------------------------------------------", flush=True)
+    # Hàm xử lý tin nhắn chung cho các bot chính
+    def on_message_handler(resp, enabled_flag_func, threshold_func, reaction_config, bot_name):
+        if resp.event.message:
+            msg = resp.parsed.auto()
+            if (msg.get("author", {}).get("id") == karuta_id and 
+                msg.get("channel_id") == main_channel_id and 
+                "is dropping" not in msg.get("content", "") and 
+                not msg.get("mentions", []) and enabled_flag_func()):
+                
+                last_drop_msg_id = msg["id"]
+                # Gọi hàm xử lý chính trong một luồng mới
+                threading.Thread(target=process_karuta_drop, args=(
+                    bot, last_drop_msg_id, main_channel_id, karibbit_id, 
+                    ktb_channel_id, threshold_func(), reaction_config, bot_name
+                )).start()
+
+    # Gán hàm xử lý cho từng bot chính với cấu hình tương ứng
+    if is_main:
+        reaction_config_1 = [("1️⃣", 0.5), ("2️⃣", 1.5), ("3️⃣", 2.2)]
+        @bot.gateway.command
+        def on_message(resp):
+            # Dùng lambda để truyền giá trị biến global vào hàm
+            on_message_handler(resp, lambda: auto_grab_enabled, lambda: heart_threshold, reaction_config_1, "Bot 1")
+
+    if is_main_2:
+        reaction_config_2 = [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)]
+        @bot.gateway.command
+        def on_message_2(resp):
+            on_message_handler(resp, lambda: auto_grab_enabled_2, lambda: heart_threshold_2, reaction_config_2, "Bot 2")
+
+    if is_main_3:
+        reaction_config_3 = [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)] # Giả sử cấu hình giống Bot 2
+        @bot.gateway.command
+        def on_message_3(resp):
+            on_message_handler(resp, lambda: auto_grab_enabled_3, lambda: heart_threshold_3, reaction_config_3, "Bot 3")
+    
+    threading.Thread(target=bot.gateway.run, daemon=True).start()
+    return bot
 
     if bot_number is not None:
         @bot.gateway.command

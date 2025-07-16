@@ -1,4 +1,4 @@
-# PHIÊN BẢN CUỐI CÙNG - FINAL HYBRID (FIX GIAO DIỆN & LOAD SETTINGS)
+# PHIÊN BẢN CUỐI CÙNG - THÊM DEBUG LOGS
 import discum
 import threading
 import time
@@ -111,38 +111,10 @@ def load_settings():
         if req.status_code == 200:
             settings = req.json().get("record", {})
             if settings:
-                global auto_grab_enabled_1, heart_threshold_1, auto_grab_enabled_2, heart_threshold_2, auto_grab_enabled_3, heart_threshold_3, auto_grab_enabled_4, heart_threshold_4, auto_grab_enabled_5, heart_threshold_5, auto_grab_enabled_6, heart_threshold_6
-                global spam_enabled, spam_message, spam_delay, auto_work_enabled, work_delay_between_acc, work_delay_after_all, auto_daily_enabled, daily_delay_between_acc, daily_delay_after_all, auto_kvi_enabled, kvi_click_count, kvi_click_delay, kvi_loop_delay, auto_reboot_enabled, auto_reboot_delay, bot_active_states, last_work_cycle_time, last_daily_cycle_time, last_kvi_cycle_time, last_reboot_cycle_time, last_spam_time
-                
-                # Nạp an toàn từng giá trị
-                auto_grab_enabled_1 = settings.get('auto_grab_enabled_1', False); heart_threshold_1 = settings.get('heart_threshold_1', 50)
-                auto_grab_enabled_2 = settings.get('auto_grab_enabled_2', False); heart_threshold_2 = settings.get('heart_threshold_2', 50)
-                auto_grab_enabled_3 = settings.get('auto_grab_enabled_3', False); heart_threshold_3 = settings.get('heart_threshold_3', 50)
-                auto_grab_enabled_4 = settings.get('auto_grab_enabled_4', False); heart_threshold_4 = settings.get('heart_threshold_4', 50)
-                auto_grab_enabled_5 = settings.get('auto_grab_enabled_5', False); heart_threshold_5 = settings.get('heart_threshold_5', 50)
-                auto_grab_enabled_6 = settings.get('auto_grab_enabled_6', False); heart_threshold_6 = settings.get('heart_threshold_6', 50)
-
-                spam_enabled = settings.get('spam_enabled', False)
-                spam_message = settings.get('spam_message', "")
-                spam_delay = settings.get('spam_delay', 10)
-                auto_work_enabled = settings.get('auto_work_enabled', False)
-                work_delay_between_acc = settings.get('work_delay_between_acc', 10)
-                work_delay_after_all = settings.get('work_delay_after_all', 44100)
-                auto_daily_enabled = settings.get('auto_daily_enabled', False)
-                daily_delay_between_acc = settings.get('daily_delay_between_acc', 3)
-                daily_delay_after_all = settings.get('daily_delay_after_all', 87000)
-                auto_kvi_enabled = settings.get('auto_kvi_enabled', False)
-                kvi_click_count = settings.get('kvi_click_count', 10)
-                kvi_click_delay = settings.get('kvi_click_delay', 3)
-                kvi_loop_delay = settings.get('kvi_loop_delay', 7500)
-                auto_reboot_enabled = settings.get('auto_reboot_enabled', False)
-                auto_reboot_delay = settings.get('auto_reboot_delay', 3600)
-                bot_active_states = settings.get('bot_active_states', {})
-                last_work_cycle_time = settings.get('last_work_cycle_time', 0)
-                last_daily_cycle_time = settings.get('last_daily_cycle_time', 0)
-                last_kvi_cycle_time = settings.get('last_kvi_cycle_time', 0)
-                last_reboot_cycle_time = settings.get('last_reboot_cycle_time', 0)
-                last_spam_time = settings.get('last_spam_time', 0)
+                # Cập nhật các biến global một cách an toàn
+                for key, value in settings.items():
+                    if key in globals():
+                        globals()[key] = value
                 print("[Settings] Đã tải cài đặt từ JSONBin.io.", flush=True)
             else:
                 print("[Settings] JSONBin rỗng, bắt đầu với cài đặt mặc định và lưu lại.", flush=True)
@@ -188,6 +160,7 @@ def create_bot(token, bot_number=None):
                 bot_type = f"({main_bot_configs[bot_number]['name']})" if bot_number else ""
                 print(f"Đã đăng nhập: {user_id} {bot_type}", flush=True)
 
+    # THÊM LOG GỠ LỖI
     def generic_on_message(bot_instance, channel_id, last_drop_id, heart_val, num, emoji_config):
         try:
             messages = bot_instance.getMessages(channel_id, num=5).json()
@@ -195,19 +168,36 @@ def create_bot(token, bot_number=None):
                 if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
                     desc = msg_item["embeds"][0].get("description", "")
                     lines = desc.split('\n')
+                    print(f"---[DEBUG LOG BOT {num}]---")
+                    print(f"  > Tin nhắn Karibbit tìm thấy: {desc.replace Gỡ lỗi:", flush=True)
+                    
                     heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
+                    print(f"  > Danh sách tim trích xuất được: {heart_numbers}", flush=True)
+                    
                     max_num = max(heart_numbers)
+                    print(f"  > Số tim lớn nhất tìm thấy: {max_num}", flush=True)
+                    
                     if sum(heart_numbers) > 0 and max_num >= heart_val:
                         max_index = heart_numbers.index(max_num)
+                        print(f"  > Vị trí (index) của tim lớn nhất: {max_index}", flush=True)
+                        
                         emoji, delay = emoji_config[max_index]
-                        print(f"[Bot {num}][Kênh {channel_id}] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
+                        print(f"  > QUYẾT ĐỊNH: Nhặt thẻ ở vị trí {max_index+1} với emoji {emoji} sau {delay}s.", flush=True)
+                        print("--------------------------")
+                        
                         def grab():
                             bot_instance.addReaction(channel_id, last_drop_id, emoji)
                             time.sleep(2)
                             bot_instance.sendMessage(ktb_channel_id, "kt b")
                         threading.Timer(delay, grab).start()
+                    else:
+                        print(f"  > QUYẾT ĐỊNH: Không nhặt thẻ vì số tim lớn nhất ({max_num}) không đạt ngưỡng ({heart_val}).", flush=True)
+                        print("--------------------------")
                     break
-        except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot {num}): {e}", flush=True)
+        except Exception as e: 
+            print(f"---[DEBUG LOG BOT {num}]---", flush=True)
+            print(f"  > Lỗi nghiêm trọng trong hàm generic_on_message: {e}", flush=True)
+            print("--------------------------")
 
     if bot_number is not None:
         @bot.gateway.command
@@ -233,6 +223,8 @@ def create_bot(token, bot_number=None):
 
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
+
+# ... (Các hàm logic phụ và vòng lặp nền không thay đổi) ...
 
 def run_work_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
@@ -327,10 +319,6 @@ def run_kvi_bot(token):
             time.sleep(kvi_click_delay); click_button(channel_id, message_id, btn["custom_id"], app_id, guild_id); state["click_count"] += 1
             if state["click_count"] >= kvi_click_count: print("[KVI] DONE. Đã click đủ.", flush=True); state["step"] = 2; bot.gateway.close()
     print("[KVI] Bắt đầu...", flush=True); threading.Thread(target=bot.gateway.run, daemon=True).start(); time.sleep(1); bot.sendMessage(kvi_channel_id, "kvi")
-    timeout = time.time() + (kvi_click_count * kvi_click_delay) + 15
-    while state["step"] != 2 and time.time() < timeout: time.sleep(0.5)
-    bot.gateway.close(); print(f"[KVI] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
-    
 # --- CÁC VÒNG LẶP NỀN ---
 def auto_work_loop():
     global last_work_cycle_time

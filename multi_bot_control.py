@@ -1,4 +1,4 @@
-# PHIÊN BẢN CUỐI CÙNG - REFACTORED (FIX LỖI GIAO DIỆN)
+# PHIÊN BẢN CUỐI CÙNG - FINAL HYBRID (FIX GIAO DIỆN)
 import discum
 import threading
 import time
@@ -38,15 +38,16 @@ for i in range(1, 7):
             "name": GREEK_LETTERS.get(i, f"MAIN_{i}")
         }
 
-# --- BIẾN TRẠNG THÁI ---
+# --- BIẾN TRẠNG THÁI (THEO PHONG CÁCH GỐC) ---
 bots, main_bots = [], {}
 acc_names = [
     "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
     "Ylang", "Nina", "Nathan", "Ofer", "White", "the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Token",
 ]
 
-auto_grab_enabled = {i: False for i in range(1, 7)}
-heart_threshold = {i: 50 for i in range(1, 7)}
+# Hoàn nguyên về các biến riêng lẻ cho từng bot chính để đảm bảo tương thích
+auto_grab_enabled_1, auto_grab_enabled_2, auto_grab_enabled_3, auto_grab_enabled_4, auto_grab_enabled_5, auto_grab_enabled_6 = False, False, False, False, False, False
+heart_threshold_1, heart_threshold_2, heart_threshold_3, heart_threshold_4, heart_threshold_5, heart_threshold_6 = 50, 50, 50, 50, 50, 50
 
 spam_enabled, auto_work_enabled, auto_reboot_enabled = False, False, False
 spam_message, spam_delay, work_delay_between_acc, work_delay_after_all, auto_reboot_delay = "", 10, 10, 44100, 3600
@@ -72,6 +73,12 @@ def save_settings():
     if not api_key or not bin_id: return
 
     settings = {
+        'auto_grab_enabled_1': auto_grab_enabled_1, 'heart_threshold_1': heart_threshold_1,
+        'auto_grab_enabled_2': auto_grab_enabled_2, 'heart_threshold_2': heart_threshold_2,
+        'auto_grab_enabled_3': auto_grab_enabled_3, 'heart_threshold_3': heart_threshold_3,
+        'auto_grab_enabled_4': auto_grab_enabled_4, 'heart_threshold_4': heart_threshold_4,
+        'auto_grab_enabled_5': auto_grab_enabled_5, 'heart_threshold_5': heart_threshold_5,
+        'auto_grab_enabled_6': auto_grab_enabled_6, 'heart_threshold_6': heart_threshold_6,
         'spam_enabled': spam_enabled, 'spam_message': spam_message, 'spam_delay': spam_delay,
         'auto_work_enabled': auto_work_enabled, 'work_delay_between_acc': work_delay_between_acc, 'work_delay_after_all': work_delay_after_all,
         'auto_daily_enabled': auto_daily_enabled, 'daily_delay_between_acc': daily_delay_between_acc, 'daily_delay_after_all': daily_delay_after_all,
@@ -84,9 +91,6 @@ def save_settings():
         'last_reboot_cycle_time': last_reboot_cycle_time,
         'last_spam_time': last_spam_time,
     }
-    for i in range(1, 7):
-        settings[f'auto_grab_enabled_{i}'] = auto_grab_enabled.get(i, False)
-        settings[f'heart_threshold_{i}'] = heart_threshold.get(i, 50)
 
     headers = {'Content-Type': 'application/json', 'X-Master-Key': api_key}
     url = f"https://api.jsonbin.io/v3/b/{bin_id}"
@@ -109,34 +113,7 @@ def load_settings():
         if req.status_code == 200:
             settings = req.json().get("record", {})
             if settings:
-                global spam_enabled, spam_message, spam_delay, auto_work_enabled, work_delay_between_acc, work_delay_after_all, auto_daily_enabled, daily_delay_between_acc, daily_delay_after_all, auto_kvi_enabled, kvi_click_count, kvi_click_delay, kvi_loop_delay, auto_reboot_enabled, auto_reboot_delay, bot_active_states, last_work_cycle_time, last_daily_cycle_time, last_kvi_cycle_time, last_reboot_cycle_time, last_spam_time
-                
-                spam_enabled = settings.get('spam_enabled', False)
-                spam_message = settings.get('spam_message', "")
-                spam_delay = settings.get('spam_delay', 10)
-                auto_work_enabled = settings.get('auto_work_enabled', False)
-                work_delay_between_acc = settings.get('work_delay_between_acc', 10)
-                work_delay_after_all = settings.get('work_delay_after_all', 44100)
-                auto_daily_enabled = settings.get('auto_daily_enabled', False)
-                daily_delay_between_acc = settings.get('daily_delay_between_acc', 3)
-                daily_delay_after_all = settings.get('daily_delay_after_all', 87000)
-                auto_kvi_enabled = settings.get('auto_kvi_enabled', False)
-                kvi_click_count = settings.get('kvi_click_count', 10)
-                kvi_click_delay = settings.get('kvi_click_delay', 3)
-                kvi_loop_delay = settings.get('kvi_loop_delay', 7500)
-                auto_reboot_enabled = settings.get('auto_reboot_enabled', False)
-                auto_reboot_delay = settings.get('auto_reboot_delay', 3600)
-                bot_active_states = settings.get('bot_active_states', {})
-                last_work_cycle_time = settings.get('last_work_cycle_time', 0)
-                last_daily_cycle_time = settings.get('last_daily_cycle_time', 0)
-                last_kvi_cycle_time = settings.get('last_kvi_cycle_time', 0)
-                last_reboot_cycle_time = settings.get('last_reboot_cycle_time', 0)
-                last_spam_time = settings.get('last_spam_time', 0)
-                
-                for i in range(1, 7):
-                    auto_grab_enabled[i] = settings.get(f'auto_grab_enabled_{i}', False)
-                    heart_threshold[i] = settings.get(f'heart_threshold_{i}', 50)
-                
+                globals().update(settings)
                 print("[Settings] Đã tải cài đặt từ JSONBin.io.", flush=True)
             else:
                 print("[Settings] JSONBin rỗng, bắt đầu với cài đặt mặc định và lưu lại.", flush=True)
@@ -206,8 +183,8 @@ def create_bot(token, bot_number=None):
     if bot_number is not None:
         @bot.gateway.command
         def on_message(resp):
-            is_enabled = auto_grab_enabled.get(bot_number, False)
-            threshold = heart_threshold.get(bot_number, 50)
+            is_enabled = globals().get(f'auto_grab_enabled_{bot_number}', False)
+            threshold = globals().get(f'heart_threshold_{bot_number}', 50)
             channels_to_check = main_bot_configs.get(bot_number, {}).get("channels", [])
             emoji_configs = [
                 [("1️⃣", 0.5), ("2️⃣", 1.5), ("3️⃣", 2.2)], [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)],
@@ -324,7 +301,7 @@ def run_kvi_bot(token):
     timeout = time.time() + (kvi_click_count * kvi_click_delay) + 15
     while state["step"] != 2 and time.time() < timeout: time.sleep(0.5)
     bot.gateway.close(); print(f"[KVI] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
-
+    
 # --- CÁC VÒNG LẶP NỀN ---
 def auto_work_loop():
     global last_work_cycle_time
@@ -550,15 +527,60 @@ HTML_TEMPLATE = """
             <div class="panel blood-panel">
                 <h2 data-text="Soul Harvest"><i class="fas fa-crosshairs"></i> Soul Harvest</h2>
                 <div class="harvest-grid">
-                    {% for i, config in main_bot_configs_view.items() %}
+                    {% if main_bot_configs.get(1) %}
                     <div class="grab-section">
-                        <h3>{{ config.name }} NODE <span id="harvest-status-{{ i }}" class="status-badge {{ config.grab_status }}">{{ config.grab_text }}</span></h3>
+                        <h3>ALPHA NODE <span id="harvest-status-1" class="status-badge {{ grab_status_1 }}">{{ grab_text_1 }}</span></h3>
                         <div class="input-group">
-                            <input type="number" id="heart-threshold-{{ i }}" value="{{ config.heart_threshold }}" min="0">
-                            <button type="button" id="harvest-toggle-{{ i }}" class="btn {{ config.grab_button_class }}">{{ config.grab_action }}</button>
+                            <input type="number" id="heart-threshold-1" value="{{ heart_threshold_1 }}" min="0">
+                            <button type="button" id="harvest-toggle-1" class="btn {{ grab_button_class_1 }}">{{ grab_action_1 }}</button>
                         </div>
                     </div>
-                    {% endfor %}
+                    {% endif %}
+                    {% if main_bot_configs.get(2) %}
+                    <div class="grab-section">
+                        <h3>BETA NODE <span id="harvest-status-2" class="status-badge {{ grab_status_2 }}">{{ grab_text_2 }}</span></h3>
+                        <div class="input-group">
+                            <input type="number" id="heart-threshold-2" value="{{ heart_threshold_2 }}" min="0">
+                            <button type="button" id="harvest-toggle-2" class="btn {{ grab_button_class_2 }}">{{ grab_action_2 }}</button>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if main_bot_configs.get(3) %}
+                    <div class="grab-section">
+                        <h3>GAMMA NODE <span id="harvest-status-3" class="status-badge {{ grab_status_3 }}">{{ grab_text_3 }}</span></h3>
+                        <div class="input-group">
+                            <input type="number" id="heart-threshold-3" value="{{ heart_threshold_3 }}" min="0">
+                            <button type="button" id="harvest-toggle-3" class="btn {{ grab_button_class_3 }}">{{ grab_action_3 }}</button>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if main_bot_configs.get(4) %}
+                    <div class="grab-section">
+                        <h3>DELTA NODE <span id="harvest-status-4" class="status-badge {{ grab_status_4 }}">{{ grab_text_4 }}</span></h3>
+                        <div class="input-group">
+                            <input type="number" id="heart-threshold-4" value="{{ heart_threshold_4 }}" min="0">
+                            <button type="button" id="harvest-toggle-4" class="btn {{ grab_button_class_4 }}">{{ grab_action_4 }}</button>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if main_bot_configs.get(5) %}
+                    <div class="grab-section">
+                        <h3>EPSILON NODE <span id="harvest-status-5" class="status-badge {{ grab_status_5 }}">{{ grab_text_5 }}</span></h3>
+                        <div class="input-group">
+                            <input type="number" id="heart-threshold-5" value="{{ heart_threshold_5 }}" min="0">
+                            <button type="button" id="harvest-toggle-5" class="btn {{ grab_button_class_5 }}">{{ grab_action_5 }}</button>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if main_bot_configs.get(6) %}
+                    <div class="grab-section">
+                        <h3>ZETA NODE <span id="harvest-status-6" class="status-badge {{ grab_status_6 }}">{{ grab_text_6 }}</span></h3>
+                        <div class="input-group">
+                            <input type="number" id="heart-threshold-6" value="{{ heart_threshold_6 }}" min="0">
+                            <button type="button" id="harvest-toggle-6" class="btn {{ grab_button_class_6 }}">{{ grab_action_6 }}</button>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -604,7 +626,7 @@ HTML_TEMPLATE = """
                 <hr style="border-color: var(--border-color); margin: 20px 0;">
                 <h3 style="text-align:center; font-family: 'Orbitron';">MANUAL OVERRIDE</h3>
                 <div id="reboot-grid-container" class="reboot-grid" style="margin-top: 15px;">
-                    {% for i, config in main_bot_configs_view.items() %}
+                    {% for i, config in main_bot_configs.items() %}
                     <button type="button" data-reboot-target="main_{{ i }}" class="btn btn-necro btn-sm">{{ config.name }}</button>
                     {% endfor %}
                     {{ sub_account_buttons|safe }}
@@ -656,7 +678,7 @@ HTML_TEMPLATE = """
                 });
                 const result = await response.json();
                 showStatusMessage(result.message);
-                setTimeout(fetchStatus, 1000);
+                setTimeout(fetchStatus, 500);
                 return result;
             } catch (error) {
                 console.error('Error posting data:', error);
@@ -700,16 +722,10 @@ HTML_TEMPLATE = """
                 const serverUptimeSeconds = (Date.now() / 1000) - data.server_start_time;
                 updateElement('uptime-timer', { textContent: formatTime(serverUptimeSeconds) });
 
-                for(const i in data.ui_states.main_bots) {
-                    const toggleBtn = document.getElementById(`harvest-toggle-${i}`);
-                    const statusBadge = document.getElementById(`harvest-status-${i}`);
-                    if(toggleBtn && statusBadge) {
-                        const botState = data.ui_states.main_bots[i];
-                        toggleBtn.textContent = botState.grab_action;
-                        toggleBtn.className = `btn ${botState.grab_button_class}`;
-                        statusBadge.textContent = botState.grab_text;
-                        statusBadge.className = `status-badge ${botState.grab_status}`;
-                    }
+                // Logic to update UI from flat ui_states dictionary
+                for(let i=1; i<=6; i++) {
+                    updateElement(`harvest-toggle-${i}`, { textContent: data.ui_states[`grab_action_${i}`], className: `btn ${data.ui_states[`grab_button_class_${i}`]}` });
+                    updateElement(`harvest-status-${i}`, { textContent: data.ui_states[`grab_text_${i}`], className: `status-badge ${data.ui_states[`grab_status_${i}`]}` });
                 }
 
                 updateElement('auto-work-toggle-btn', { textContent: `${data.ui_states.work_action} WORK`, className: `btn ${data.ui_states.work_button_class}` });
@@ -736,14 +752,12 @@ HTML_TEMPLATE = """
         setInterval(fetchStatus, 1000);
 
         // --- Event Listeners ---
-        document.querySelectorAll('.harvest-grid .grab-section').forEach(section => {
-            const button = section.querySelector('button');
-            const input = section.querySelector('input');
-            if (button && input) {
-                const i = button.id.split('-').pop();
-                button.addEventListener('click', () => postData('/api/harvest_toggle', { node: parseInt(i), threshold: input.value }));
+        for(let i=1; i<=6; i++) {
+            const btn = document.getElementById(`harvest-toggle-${i}`);
+            if (btn) {
+                 btn.addEventListener('click', () => postData('/api/harvest_toggle', { node: i, threshold: document.getElementById(`heart-threshold-${i}`).value }));
             }
-        });
+        }
         
         document.getElementById('send-manual-message-btn').addEventListener('click', () => {
             postData('/api/manual_ops', { message: document.getElementById('manual-message-input').value })
@@ -804,46 +818,39 @@ HTML_TEMPLATE = """
 </html>
 """
 
+# --- FLASK ROUTES ---
 @app.route("/")
 def index():
     def get_ui_state(enabled):
-        if enabled:
-            return "active", "ON", "DISABLE", "btn-blood"
-        else:
-            return "inactive", "OFF", "ENABLE", "btn-necro"
+        return ("active", "ON", "DISABLE", "btn-blood") if enabled else ("inactive", "OFF", "ENABLE", "btn-necro")
 
-    main_bot_configs_view = {}
-    for i, config in main_bot_configs.items():
-        is_enabled = auto_grab_enabled.get(i, False)
-        status, text, action, btn_class = get_ui_state(is_enabled)
-        main_bot_configs_view[i] = {
-            "name": config["name"],
-            "heart_threshold": heart_threshold.get(i, 50),
-            "grab_status": status,
-            "grab_text": text,
-            "grab_action": action,
-            "grab_button_class": btn_class
-        }
+    grab_status_1, grab_text_1, grab_action_1, grab_button_class_1 = get_ui_state(auto_grab_enabled_1)
+    grab_status_2, grab_text_2, grab_action_2, grab_button_class_2 = get_ui_state(auto_grab_enabled_2)
+    grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = get_ui_state(auto_grab_enabled_3)
+    grab_status_4, grab_text_4, grab_action_4, grab_button_class_4 = get_ui_state(auto_grab_enabled_4)
+    grab_status_5, grab_text_5, grab_action_5, grab_button_class_5 = get_ui_state(auto_grab_enabled_5)
+    grab_status_6, grab_text_6, grab_action_6, grab_button_class_6 = get_ui_state(auto_grab_enabled_6)
     
-    # DEBUG: In ra context sẽ được render để kiểm tra
-    # print("--- DEBUG: CONTEXT FOR TEMPLATE ---", flush=True)
-    # pprint.pprint(main_bot_configs_view, flush=True)
-    # print("---------------------------------", flush=True)
-
-    spam_action, spam_button_class = get_ui_state(spam_enabled)[2:]
-    work_action, work_button_class = get_ui_state(auto_work_enabled)[2:]
-    daily_action, daily_button_class = get_ui_state(auto_daily_enabled)[2:]
-    kvi_action, kvi_button_class = get_ui_state(auto_kvi_enabled)[2:]
-    reboot_action, reboot_button_class = get_ui_state(auto_reboot_enabled)[2:]
+    spam_status, _, spam_action, spam_button_class = get_ui_state(spam_enabled)
+    work_status, _, work_action, work_button_class = get_ui_state(auto_work_enabled)
+    daily_status, _, daily_action, daily_button_class = get_ui_state(auto_daily_enabled)
+    kvi_status, _, kvi_action, kvi_button_class = get_ui_state(auto_kvi_enabled)
+    reboot_status, _, reboot_action, reboot_button_class = get_ui_state(auto_reboot_enabled)
     
     acc_options = "".join(f'<option value="sub_{i}">{name}</option>' for i, name in enumerate(acc_names[:len(bots)]))
     for i, config in main_bot_configs.items():
         acc_options += f'<option value="main_{i}">{config["name"]} NODE (Main)</option>'
 
     sub_account_buttons = "".join(f'<button type="button" data-reboot-target="sub_{i}" class="btn btn-necro btn-sm">{name}</button>' for i, name in enumerate(acc_names[:len(bots)]))
-
-    return render_template_string(HTML_TEMPLATE,
-        main_bot_configs_view=main_bot_configs_view,
+    
+    return render_template_string(HTML_TEMPLATE, 
+        main_bot_configs=main_bot_configs,
+        grab_status_1=grab_status_1, grab_text_1=grab_text_1, grab_action_1=grab_action_1, grab_button_class_1=grab_button_class_1, heart_threshold_1=heart_threshold_1,
+        grab_status_2=grab_status_2, grab_text_2=grab_text_2, grab_action_2=grab_action_2, grab_button_class_2=grab_button_class_2, heart_threshold_2=heart_threshold_2,
+        grab_status_3=grab_status_3, grab_text_3=grab_text_3, grab_action_3=grab_action_3, grab_button_class_3=grab_button_class_3, heart_threshold_3=heart_threshold_3,
+        grab_status_4=grab_status_4, grab_text_4=grab_text_4, grab_action_4=grab_action_4, grab_button_class_4=grab_button_class_4, heart_threshold_4=heart_threshold_4,
+        grab_status_5=grab_status_5, grab_text_5=grab_text_5, grab_action_5=grab_action_5, grab_button_class_5=grab_button_class_5, heart_threshold_5=heart_threshold_5,
+        grab_status_6=grab_status_6, grab_text_6=grab_text_6, grab_action_6=grab_action_6, grab_button_class_6=grab_button_class_6, heart_threshold_6=heart_threshold_6,
         spam_message=spam_message, spam_delay=spam_delay, spam_action=spam_action, spam_button_class=spam_button_class,
         work_delay_between_acc=work_delay_between_acc, work_delay_after_all=work_delay_after_all, work_action=work_action, work_button_class=work_button_class,
         daily_delay_between_acc=daily_delay_between_acc, daily_delay_after_all=daily_delay_after_all, daily_action=daily_action, daily_button_class=daily_button_class,
@@ -856,12 +863,19 @@ def index():
 def api_harvest_toggle():
     data = request.get_json()
     node = data.get('node')
-    threshold_val = int(data.get('threshold', 50))
-    msg = "Node không hợp lệ."
-    if node in auto_grab_enabled:
-        auto_grab_enabled[node] = not auto_grab_enabled[node]
-        heart_threshold[node] = threshold_val
-        msg = f"Auto Grab cho {main_bot_configs[node]['name']} đã {'BẬT' if auto_grab_enabled[node] else 'TẮT'}"
+    threshold = int(data.get('threshold', 50))
+    msg = f"Node {node} không hợp lệ."
+    
+    # Dùng globals() để truy cập và thay đổi biến động
+    enabled_var = f'auto_grab_enabled_{node}'
+    threshold_var = f'heart_threshold_{node}'
+    
+    if enabled_var in globals():
+        globals()[enabled_var] = not globals()[enabled_var]
+        globals()[threshold_var] = threshold
+        state = "BẬT" if globals()[enabled_var] else "TẮT"
+        msg = f"Auto Grab cho Node {node} đã được {state}"
+        
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/api/inject_codes", methods=['POST'])
@@ -1011,18 +1025,28 @@ def status():
             for i, bot in enumerate(bots)
         ]
     
-    def get_ui_state_dict(enabled_flag): return {"status": "active" if enabled_flag else "inactive", "text": "ON" if enabled_flag else "OFF", "action": "DISABLE" if enabled_flag else "ENABLE", "button_class": "btn-blood" if enabled_flag else "btn-necro"}
-    ui_states = {
-        "spam_action": "DISABLE" if spam_enabled else "ENABLE", "spam_button_class": "btn-blood" if spam_enabled else "btn-necro",
-        "work_action": "DISABLE" if auto_work_enabled else "ENABLE", "work_button_class": "btn-blood" if auto_work_enabled else "btn-necro",
-        "daily_action": "DISABLE" if auto_daily_enabled else "ENABLE", "daily_button_class": "btn-blood" if auto_daily_enabled else "btn-necro",
-        "kvi_action": "DISABLE" if auto_kvi_enabled else "ENABLE", "kvi_button_class": "btn-blood" if auto_kvi_enabled else "btn-necro",
-        "reboot_action": "DISABLE" if auto_reboot_enabled else "ENABLE", "reboot_button_class": "btn-blood" if auto_reboot_enabled else "btn-necro",
-        "main_bots": {}
-    }
-    for i in main_bot_configs.keys():
-        ui_states["main_bots"][i] = get_ui_state_dict(auto_grab_enabled.get(i, False))
+    def get_ui_state_dict(enabled):
+        return ("active", "ON", "DISABLE", "btn-blood") if enabled else ("inactive", "OFF", "ENABLE", "btn-necro")
 
+    ui_states = {}
+    states_map = {
+        '1': get_ui_state_dict(auto_grab_enabled_1),
+        '2': get_ui_state_dict(auto_grab_enabled_2),
+        '3': get_ui_state_dict(auto_grab_enabled_3),
+        '4': get_ui_state_dict(auto_grab_enabled_4),
+        '5': get_ui_state_dict(auto_grab_enabled_5),
+        '6': get_ui_state_dict(auto_grab_enabled_6),
+    }
+
+    for i in range(1, 7):
+        ui_states[f'grab_status_{i}'], ui_states[f'grab_text_{i}'], ui_states[f'grab_action_{i}'], ui_states[f'grab_button_class_{i}'] = states_map[str(i)]
+
+    _, _, ui_states['spam_action'], ui_states['spam_button_class'] = get_ui_state_dict(spam_enabled)
+    _, _, ui_states['work_action'], ui_states['work_button_class'] = get_ui_state_dict(auto_work_enabled)
+    _, _, ui_states['daily_action'], ui_states['daily_button_class'] = get_ui_state_dict(auto_daily_enabled)
+    _, _, ui_states['kvi_action'], ui_states['kvi_button_class'] = get_ui_state_dict(auto_kvi_enabled)
+    _, _, ui_states['reboot_action'], ui_states['reboot_button_class'] = get_ui_state_dict(auto_reboot_enabled)
+    
     return jsonify({
         'work_enabled': auto_work_enabled, 'work_countdown': work_countdown,
         'daily_enabled': auto_daily_enabled, 'daily_countdown': daily_countdown,

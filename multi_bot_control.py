@@ -1,4 +1,4 @@
-# PHIÊN BẢN CUỐI CÙNG - HOÀN CHỈNH VÀ ỔN ĐỊNH
+# PHIÊN BẢN CUỐI CÙNG - REFACTORED (6 ACC CHÍNH, SPAM/NHẶT DROP ĐA KÊNH, CHỈ ĐỊNH KÊNH RIÊNG)
 import discum
 import threading
 import time
@@ -13,41 +13,61 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- CẤU HÌNH ---
-main_token = os.getenv("MAIN_TOKEN")
-main_token_2 = os.getenv("MAIN_TOKEN_2")
-main_token_3 = os.getenv("MAIN_TOKEN_3")
+# Cấu hình tài khoản phụ
 tokens = os.getenv("TOKENS").split(",") if os.getenv("TOKENS") else []
-main_channel_id = os.getenv("MAIN_CHANNEL_ID")
 other_channel_id = os.getenv("OTHER_CHANNEL_ID")
 ktb_channel_id = os.getenv("KTB_CHANNEL_ID")
-spam_channel_id = os.getenv("SPAM_CHANNEL_ID")
 work_channel_id = os.getenv("WORK_CHANNEL_ID")
 daily_channel_id = os.getenv("DAILY_CHANNEL_ID")
 kvi_channel_id = os.getenv("KVI_CHANNEL_ID")
+
+# Cấu hình spam đa kênh
+spam_channel_ids = os.getenv("SPAM_CHANNEL_ID", "").split(',') if os.getenv("SPAM_CHANNEL_ID") else []
+
+# Cấu hình ID bot
 karuta_id = "646937666251915264"
 karibbit_id = "1274445226064220273"
 
-# --- BIẾN TRẠNG THÁI (đây là các giá trị mặc định nếu không có file settings.json) ---
-bots, acc_names = [], [
-   "accphu1","accphu2","accphu3","accphu4","accphu5","accphu6","accphu7","accphu8","accphu9","accphu10","accphu11","accphu12",
+# THAY ĐỔI LỚN: Cấu hình tài khoản chính và kênh nhặt thẻ tương ứng
+main_bot_configs = {}
+GREEK_LETTERS = {1: "ALPHA", 2: "BETA", 3: "GAMMA", 4: "DELTA", 5: "EPSILON", 6: "ZETA"}
+for i in range(1, 7):
+    token_env_name = f"MAIN_TOKEN_{i}" if i > 1 else "MAIN_TOKEN"
+    token = os.getenv(token_env_name)
+    if token:
+        channels_str = os.getenv(f"MAIN_{i}_CHANNELS", "")
+        channels = [c.strip() for c in channels_str.split(',') if c.strip()]
+        main_bot_configs[i] = {
+            "token": token,
+            "channels": channels,
+            "name": GREEK_LETTERS.get(i, f"MAIN_{i}")
+        }
+
+# --- BIẾN TRẠNG THÁI ---
+bots, main_bots = [], {} # Tách biệt bot chính và phụ
+acc_names = [
+    "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
+    "Ylang", "Nina", "Nathan", "Ofer", "White", "the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Token",
 ]
-main_bot, main_bot_2, main_bot_3 = None, None, None
-auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3 = False, False, False
-heart_threshold, heart_threshold_2, heart_threshold_3 = 50, 50, 50
+
+# Trạng thái auto-grab, lưu dưới dạng dictionary
+auto_grab_enabled = {i: False for i in range(1, 7)}
+heart_threshold = {i: 50 for i in range(1, 7)}
+
 spam_enabled, auto_work_enabled, auto_reboot_enabled = False, False, False
 spam_message, spam_delay, work_delay_between_acc, work_delay_after_all, auto_reboot_delay = "", 10, 10, 44100, 3600
 auto_daily_enabled = False
-daily_delay_after_all = 87000 
+daily_delay_after_all = 87000
 daily_delay_between_acc = 3
 auto_kvi_enabled = False
 kvi_click_count = 10
 kvi_click_delay = 3
-kvi_loop_delay = 7500 
+kvi_loop_delay = 7500
 
-# Timestamps - sẽ được load từ file
+# Timestamps
 last_work_cycle_time, last_daily_cycle_time, last_kvi_cycle_time, last_reboot_cycle_time, last_spam_time = 0, 0, 0, 0, 0
 
-# Các biến điều khiển luồng
+# Biến điều khiển luồng
 auto_reboot_stop_event = threading.Event()
 spam_thread, auto_reboot_thread = None, None
 bots_lock = threading.Lock()
@@ -57,17 +77,11 @@ bot_active_states = {}
 
 # --- HÀM LƯU VÀ TẢI CÀI ĐẶT ---
 def save_settings():
-    """Lưu cài đặt lên JSONBin.io"""
-    api_key = os.getenv("JSONBIN_API_KEY")
-    bin_id = os.getenv("JSONBIN_BIN_ID")
-    if not api_key or not bin_id:
-        # print("[Settings] Thiếu API Key hoặc Bin ID của JSONBin.", flush=True)
-        return
+    api_key, bin_id = os.getenv("JSONBIN_API_KEY"), os.getenv("JSONBIN_BIN_ID")
+    if not api_key or not bin_id: return
 
+    # Chuyển đổi dict sang định dạng lưu trữ cũ để tương thích (nếu cần) hoặc lưu trực tiếp
     settings = {
-        'auto_grab_enabled': auto_grab_enabled, 'heart_threshold': heart_threshold,
-        'auto_grab_enabled_2': auto_grab_enabled_2, 'heart_threshold_2': heart_threshold_2,
-        'auto_grab_enabled_3': auto_grab_enabled_3, 'heart_threshold_3': heart_threshold_3,
         'spam_enabled': spam_enabled, 'spam_message': spam_message, 'spam_delay': spam_delay,
         'auto_work_enabled': auto_work_enabled, 'work_delay_between_acc': work_delay_between_acc, 'work_delay_after_all': work_delay_after_all,
         'auto_daily_enabled': auto_daily_enabled, 'daily_delay_between_acc': daily_delay_between_acc, 'daily_delay_after_all': daily_delay_after_all,
@@ -80,194 +94,142 @@ def save_settings():
         'last_reboot_cycle_time': last_reboot_cycle_time,
         'last_spam_time': last_spam_time,
     }
-    
-    headers = {
-        'Content-Type': 'application/json',
-        'X-Master-Key': api_key
-    }
+    # Thêm trạng thái của 6 bot chính
+    for i in range(1, 7):
+        settings[f'auto_grab_enabled_{i}'] = auto_grab_enabled.get(i, False)
+        settings[f'heart_threshold_{i}'] = heart_threshold.get(i, 50)
+
+    headers = {'Content-Type': 'application/json', 'X-Master-Key': api_key}
     url = f"https://api.jsonbin.io/v3/b/{bin_id}"
-    
     try:
         req = requests.put(url, json=settings, headers=headers, timeout=10)
-        if req.status_code == 200:
-            print("[Settings] Đã lưu cài đặt lên JSONBin.io thành công.", flush=True)
-        else:
-            print(f"[Settings] Lỗi khi lưu cài đặt lên JSONBin.io: {req.status_code} - {req.text}", flush=True)
-    except Exception as e:
-        print(f"[Settings] Exception khi lưu cài đặt: {e}", flush=True)
-
+        if req.status_code == 200: print("[Settings] Đã lưu cài đặt lên JSONBin.io thành công.", flush=True)
+        else: print(f"[Settings] Lỗi khi lưu cài đặt: {req.status_code} - {req.text}", flush=True)
+    except Exception as e: print(f"[Settings] Exception khi lưu cài đặt: {e}", flush=True)
 
 def load_settings():
-    """Tải cài đặt từ JSONBin.io"""
-    api_key = os.getenv("JSONBIN_API_KEY")
-    bin_id = os.getenv("JSONBIN_BIN_ID")
+    api_key, bin_id = os.getenv("JSONBIN_API_KEY"), os.getenv("JSONBIN_BIN_ID")
     if not api_key or not bin_id:
-        print("[Settings] Thiếu API Key hoặc Bin ID của JSONBin. Sử dụng cài đặt mặc định.", flush=True)
+        print("[Settings] Thiếu API Key/Bin ID, dùng cài đặt mặc định.", flush=True)
         return
-
-    headers = {
-        'X-Master-Key': api_key
-    }
+    
+    headers = {'X-Master-Key': api_key}
     url = f"https://api.jsonbin.io/v3/b/{bin_id}/latest"
-
     try:
         req = requests.get(url, headers=headers, timeout=10)
         if req.status_code == 200:
             settings = req.json().get("record", {})
-            if settings: # Chỉ load nếu bin không rỗng
+            if settings:
+                # Load các cài đặt chung
                 globals().update(settings)
+                # Load cài đặt riêng của các bot chính vào dictionary
+                for i in range(1, 7):
+                    auto_grab_enabled[i] = settings.get(f'auto_grab_enabled_{i}', False)
+                    heart_threshold[i] = settings.get(f'heart_threshold_{i}', 50)
                 print("[Settings] Đã tải cài đặt từ JSONBin.io.", flush=True)
             else:
                 print("[Settings] JSONBin rỗng, bắt đầu với cài đặt mặc định và lưu lại.", flush=True)
-                save_settings() # Lưu cài đặt mặc định lên bin lần đầu
+                save_settings()
         else:
-            print(f"[Settings] Lỗi khi tải cài đặt từ JSONBin.io: {req.status_code} - {req.text}", flush=True)
-    except Exception as e:
-        print(f"[Settings] Exception khi tải cài đặt: {e}", flush=True)
+            print(f"[Settings] Lỗi khi tải cài đặt: {req.status_code} - {req.text}", flush=True)
+    except Exception as e: print(f"[Settings] Exception khi tải cài đặt: {e}", flush=True)
 
 # --- CÁC HÀM LOGIC BOT ---
 def reboot_bot(target_id):
-    global main_bot, main_bot_2, main_bot_3, bots
+    global main_bots, bots
     with bots_lock:
-        print(f"[Reboot] Nhận được yêu cầu reboot cho target: {target_id}", flush=True)
-        if target_id == 'main_1' and main_token:
-            try: 
-                if main_bot: main_bot.gateway.close()
-            except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 1: {e}", flush=True)
-            main_bot = create_bot(main_token, is_main=True)
-            print("[Reboot] Acc Chính 1 đã được khởi động lại.", flush=True)
-        elif target_id == 'main_2' and main_token_2:
-            try: 
-                if main_bot_2: main_bot_2.gateway.close()
-            except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 2: {e}", flush=True)
-            main_bot_2 = create_bot(main_token_2, is_main_2=True)
-            print("[Reboot] Acc Chính 2 đã được khởi động lại.", flush=True)
-        elif target_id == 'main_3' and main_token_3:
-            try: 
-                if main_bot_3: main_bot_3.gateway.close()
-            except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 3: {e}", flush=True)
-            main_bot_3 = create_bot(main_token_3, is_main_3=True)
-            print("[Reboot] Acc Chính 3 đã được khởi động lại.", flush=True)
+        print(f"[Reboot] Yêu cầu reboot cho target: {target_id}", flush=True)
+        if target_id.startswith('main_'):
+            try:
+                bot_num = int(target_id.split('_')[1])
+                if bot_num in main_bots and bot_num in main_bot_configs:
+                    try:
+                        main_bots[bot_num].gateway.close()
+                    except Exception as e: print(f"[Reboot] Lỗi khi đóng Main Bot {bot_num}: {e}", flush=True)
+                    
+                    token = main_bot_configs[bot_num]["token"]
+                    main_bots[bot_num] = create_bot(token, bot_number=bot_num)
+                    print(f"[Reboot] Main Bot {bot_num} ({main_bot_configs[bot_num]['name']}) đã khởi động lại.", flush=True)
+            except (ValueError, IndexError) as e: print(f"[Reboot] Lỗi xử lý target Main Bot: {e}", flush=True)
+
         elif target_id.startswith('sub_'):
             try:
                 index = int(target_id.split('_')[1])
                 if 0 <= index < len(bots):
                     try: bots[index].gateway.close()
-                    except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Phụ {index}: {e}", flush=True)
+                    except Exception as e: print(f"[Reboot] Lỗi khi đóng Sub Bot {index}: {e}", flush=True)
+                    
                     token_to_reboot = tokens[index]
-                    bots[index] = create_bot(token_to_reboot.strip(), is_main=False)
-                    print(f"[Reboot] Acc Phụ {index} đã được khởi động lại.", flush=True)
-            except (ValueError, IndexError) as e: print(f"[Reboot] Lỗi xử lý target Acc Phụ: {e}", flush=True)
+                    bots[index] = create_bot(token_to_reboot.strip()) # bot_number=None for sub bots
+                    print(f"[Reboot] Sub Bot {index} đã được khởi động lại.", flush=True)
+            except (ValueError, IndexError) as e: print(f"[Reboot] Lỗi xử lý target Sub Bot: {e}", flush=True)
 
-def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
+def create_bot(token, bot_number=None):
     bot = discum.Client(token=token, log=False)
+    
     @bot.gateway.command
     def on_ready(resp):
         if resp.event.ready:
-            user_data = resp.raw.get("user")
-            if isinstance(user_data, dict):
-                user_id = user_data.get("id")
-                if user_id:
-                    if is_main: bot_type = "(ALPHA)"
-                    elif is_main_2: bot_type = "(BETA)"
-                    elif is_main_3: bot_type = "(GAMMA)"
-                    else: bot_type = ""
-                    print(f"Đã đăng nhập: {user_id} {bot_type}", flush=True)
+            user_id = resp.raw.get("user", {}).get("id")
+            if user_id:
+                bot_type = f"({main_bot_configs[bot_number]['name']})" if bot_number else ""
+                print(f"Đã đăng nhập: {user_id} {bot_type}", flush=True)
 
-    if is_main:
+    def generic_on_message(bot_instance, channel_id, last_drop_id, heart_val, num, emoji_config):
+        try:
+            messages = bot_instance.getMessages(channel_id, num=5).json()
+            for msg_item in messages:
+                if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                    desc = msg_item["embeds"][0].get("description", "")
+                    lines = desc.split('\n')
+                    heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
+                    max_num = max(heart_numbers)
+                    if sum(heart_numbers) > 0 and max_num >= heart_val:
+                        max_index = heart_numbers.index(max_num)
+                        emoji, delay = emoji_config[max_index]
+                        print(f"[Bot {num}][Kênh {channel_id}] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
+                        def grab():
+                            bot_instance.addReaction(channel_id, last_drop_id, emoji)
+                            time.sleep(2)
+                            bot_instance.sendMessage(ktb_channel_id, "kt b")
+                        threading.Timer(delay, grab).start()
+                    break
+        except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot {num}): {e}", flush=True)
+
+    if bot_number is not None:
         @bot.gateway.command
         def on_message(resp):
-            global auto_grab_enabled, heart_threshold
+            # Lấy cài đặt động cho bot này
+            is_enabled = auto_grab_enabled.get(bot_number, False)
+            threshold = heart_threshold.get(bot_number, 50)
+            channels_to_check = main_bot_configs.get(bot_number, {}).get("channels", [])
+            emoji_configs = [
+                [("1️⃣", 0.5), ("2️⃣", 1.5), ("3️⃣", 2.2)],
+                [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)],
+                [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)],
+                [("1️⃣", 0.9), ("2️⃣", 1.9), ("3️⃣", 2.6)],
+                [("1️⃣", 1.0), ("2️⃣", 2.0), ("3️⃣", 2.7)],
+                [("1️⃣", 1.1), ("2️⃣", 2.1), ("3️⃣", 2.8)]
+            ]
+            
             if resp.event.message:
                 msg = resp.parsed.auto()
-                if msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []) and auto_grab_enabled:
-                    last_drop_msg_id = msg["id"]
-                    def read_karibbit():
-                        time.sleep(0.5)
-                        try:
-                            messages = bot.getMessages(main_channel_id, num=5).json()
-                            for msg_item in messages:
-                                if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                                    desc = msg_item["embeds"][0].get("description", "")
-                                    lines = desc.split('\n')
-                                    heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
-                                    max_num = max(heart_numbers)
-                                    if sum(heart_numbers) > 0 and max_num >= heart_threshold:
-                                        max_index = heart_numbers.index(max_num)
-                                        emoji, delay = [("1️⃣", 0.5), ("2️⃣", 1.5), ("3️⃣", 2.2)][max_index]
-                                        print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
-                                        def grab():
-                                            bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                            time.sleep(2) 
-                                            bot.sendMessage(ktb_channel_id, "kt b")
-                                        threading.Timer(delay, grab).start()
-                                    break
-                        except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 1): {e}", flush=True)
-                    threading.Thread(target=read_karibbit).start()
-    if is_main_2:
-        @bot.gateway.command
-        def on_message(resp):
-            global auto_grab_enabled_2, heart_threshold_2
-            if resp.event.message:
-                msg = resp.parsed.auto()
-                if msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []) and auto_grab_enabled_2:
-                    last_drop_msg_id = msg["id"]
-                    def read_karibbit_2():
-                        time.sleep(0.5)
-                        try:
-                            messages = bot.getMessages(main_channel_id, num=5).json()
-                            for msg_item in messages:
-                                if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                                    desc = msg_item["embeds"][0].get("description", "")
-                                    lines = desc.split('\n')
-                                    heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
-                                    max_num = max(heart_numbers)
-                                    if sum(heart_numbers) > 0 and max_num >= heart_threshold_2:
-                                        max_index = heart_numbers.index(max_num)
-                                        emoji, delay = [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)][max_index]
-                                        print(f"[Bot 2] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
-                                        def grab_2():
-                                            bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                            time.sleep(2) 
-                                            bot.sendMessage(ktb_channel_id, "kt b")
-                                        threading.Timer(delay, grab_2).start()
-                                    break
-                        except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 2): {e}", flush=True)
-                    threading.Thread(target=read_karibbit_2).start()
-    if is_main_3:
-        @bot.gateway.command
-        def on_message(resp):
-            global auto_grab_enabled_3, heart_threshold_3
-            if resp.event.message:
-                msg = resp.parsed.auto()
-                if msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []) and auto_grab_enabled_3:
-                    last_drop_msg_id = msg["id"]
-                    def read_karibbit_3():
-                        time.sleep(0.5)
-                        try:
-                            messages = bot.getMessages(main_channel_id, num=5).json()
-                            for msg_item in messages:
-                                if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                                    desc = msg_item["embeds"][0].get("description", "")
-                                    lines = desc.split('\n')
-                                    heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
-                                    max_num = max(heart_numbers)
-                                    if sum(heart_numbers) > 0 and max_num >= heart_threshold_3:
-                                        max_index = heart_numbers.index(max_num)
-                                        emoji, delay = [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)][max_index]
-                                        print(f"[Bot 3] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
-                                        def grab_3():
-                                            bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                            time.sleep(2) 
-                                            bot.sendMessage(ktb_channel_id, "kt b")
-                                        threading.Timer(delay, grab_3).start()
-                                    break
-                        except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 3): {e}", flush=True)
-                    threading.Thread(target=read_karibbit_3).start()
-    
+                msg_channel_id = msg.get("channel_id")
+                if (msg.get("author", {}).get("id") == karuta_id and 
+                    msg_channel_id in channels_to_check and 
+                    "is dropping" not in msg.get("content", "") and 
+                    not msg.get("mentions", []) and 
+                    is_enabled):
+                    
+                    # Truyền ID kênh cụ thể của tin nhắn vào hàm xử lý
+                    threading.Thread(target=generic_on_message, args=(
+                        bot, msg_channel_id, msg["id"], threshold, bot_number, emoji_configs[bot_number-1]
+                    )).start()
+
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
 
+# --- Các hàm logic phụ không thay đổi ---
 def run_work_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
     headers = {"Authorization": token, "Content-Type": "application/json"}
@@ -365,7 +327,7 @@ def run_kvi_bot(token):
     while state["step"] != 2 and time.time() < timeout: time.sleep(0.5)
     bot.gateway.close(); print(f"[KVI] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
 
-# --- CÁC VÒNG LẶP NỀN (ĐÃ VIẾT LẠI CHO ỔN ĐỊNH) ---
+# --- CÁC VÒNG LẶP NỀN ---
 def auto_work_loop():
     global last_work_cycle_time
     while True:
@@ -373,8 +335,8 @@ def auto_work_loop():
             if auto_work_enabled and (time.time() - last_work_cycle_time) >= work_delay_after_all:
                 print("[Work] Đã đến giờ chạy Auto Work...", flush=True)
                 work_items = []
-                if main_token_2 and bot_active_states.get('main_2', False): work_items.append({"name": "BETA NODE", "token": main_token_2})
-                if main_token_3 and bot_active_states.get('main_3', False): work_items.append({"name": "GAMMA NODE", "token": main_token_3})
+                if main_bot_configs.get(2) and bot_active_states.get('main_2', False): work_items.append({"name": "BETA NODE", "token": main_bot_configs[2]["token"]})
+                if main_bot_configs.get(3) and bot_active_states.get('main_3', False): work_items.append({"name": "GAMMA NODE", "token": main_bot_configs[3]["token"]})
                 with bots_lock:
                     sub_account_items = [{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)]
                     work_items.extend(sub_account_items)
@@ -397,8 +359,8 @@ def auto_daily_loop():
             if auto_daily_enabled and (time.time() - last_daily_cycle_time) >= daily_delay_after_all:
                 print("[Daily] Đã đến giờ chạy Auto Daily...", flush=True)
                 daily_items = []
-                if main_token_2 and bot_active_states.get('main_2', False): daily_items.append({"name": "BETA NODE", "token": main_token_2})
-                if main_token_3 and bot_active_states.get('main_3', False): daily_items.append({"name": "GAMMA NODE", "token": main_token_3})
+                if main_bot_configs.get(2) and bot_active_states.get('main_2', False): daily_items.append({"name": "BETA NODE", "token": main_bot_configs[2]["token"]})
+                if main_bot_configs.get(3) and bot_active_states.get('main_3', False): daily_items.append({"name": "GAMMA NODE", "token": main_bot_configs[3]["token"]})
                 with bots_lock:
                     daily_items.extend([{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)])
                 for item in daily_items:
@@ -415,9 +377,9 @@ def auto_kvi_loop():
     global last_kvi_cycle_time
     while True:
         try:
-            if auto_kvi_enabled and main_token and bot_active_states.get('main_1', False) and (time.time() - last_kvi_cycle_time) >= kvi_loop_delay:
+            if auto_kvi_enabled and main_bot_configs.get(1) and bot_active_states.get('main_1', False) and (time.time() - last_kvi_cycle_time) >= kvi_loop_delay:
                 print("[KVI] Bắt đầu chu trình KVI cho Acc Chính 1...", flush=True)
-                run_kvi_bot(main_token)
+                run_kvi_bot(main_bot_configs[1]["token"])
                 if auto_kvi_enabled:
                     last_kvi_cycle_time = time.time(); save_settings()
             time.sleep(60)
@@ -429,10 +391,10 @@ def auto_reboot_loop():
     while not auto_reboot_stop_event.is_set():
         try:
             if auto_reboot_enabled and (time.time() - last_reboot_cycle_time) >= auto_reboot_delay:
-                print("[Reboot] Hết thời gian chờ, tiến hành reboot 3 tài khoản chính.", flush=True)
-                if main_bot: reboot_bot('main_1'); time.sleep(5)
-                if main_bot_2: reboot_bot('main_2'); time.sleep(5)
-                if main_bot_3: reboot_bot('main_3')
+                print("[Reboot] Hết thời gian chờ, tiến hành reboot các tài khoản chính.", flush=True)
+                for i in range(1, 7):
+                    if main_bot_configs.get(i):
+                        reboot_bot(f'main_{i}'); time.sleep(5)
                 last_reboot_cycle_time = time.time();
             interrupted = auto_reboot_stop_event.wait(timeout=60)
             if interrupted: break
@@ -444,37 +406,40 @@ def spam_loop():
     global last_spam_time
     while True:
         try:
-            if spam_enabled and spam_message and (time.time() - last_spam_time) >= spam_delay:
+            if spam_enabled and spam_message and spam_channel_ids and (time.time() - last_spam_time) >= spam_delay:
                 with bots_lock:
-                    bots_to_spam = [bot for i, bot in enumerate(bots) if bot and bot_active_states.get(f'sub_{i}', False)]
-                for idx, bot in enumerate(bots_to_spam):
-                    if not spam_enabled: break
-                    try:
-                        acc_name = acc_names[idx] if idx < len(acc_names) else f"Sub {idx+1}"
-                        bot.sendMessage(spam_channel_id, spam_message)
-                        print(f"[{acc_name}] đã gửi: {spam_message}", flush=True)
-                        time.sleep(2)
-                    except Exception as e:
-                        print(f"Lỗi gửi spam từ [{acc_name}]: {e}", flush=True)
-                if spam_enabled:
-                    last_spam_time = time.time()
+                    bots_to_spam = [
+                        (bot, acc_names[i] if i < len(acc_names) else f"Sub {i+1}")
+                        for i, bot in enumerate(bots)
+                        if bot and bot_active_states.get(f'sub_{i}', False)
+                    ]
 
+                for bot, acc_name in bots_to_spam:
+                    if not spam_enabled: break 
+                    for channel_id in spam_channel_ids:
+                        if not channel_id.strip(): continue 
+                        try:
+                            bot.sendMessage(channel_id.strip(), spam_message)
+                            print(f"[{acc_name}] đã gửi đến kênh {channel_id.strip()}: {spam_message}", flush=True)
+                            time.sleep(1)
+                        except Exception as e:
+                            print(f"Lỗi gửi spam từ [{acc_name}] đến kênh {channel_id.strip()}: {e}", flush=True)
+                    time.sleep(2)
+                if spam_enabled: last_spam_time = time.time()
             time.sleep(1)
         except Exception as e:
             print(f"[ERROR in spam_loop] {e}", flush=True)
             time.sleep(1)
 
 def periodic_save_loop():
-    """Vòng lặp nền để tự động lưu cài đặt 5 phút một lần."""
     while True:
         time.sleep(600)
-        
         print("[Settings] Bắt đầu lưu định kỳ...", flush=True)
         save_settings()
-        
+
 app = Flask(__name__)
 
-# --- GIAO DIỆN WEB ---
+# --- GIAO DIỆN WEB VÀ API ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="vi">
@@ -506,7 +471,7 @@ HTML_TEMPLATE = """
         .panel { background: linear-gradient(135deg, var(--panel-bg), rgba(26, 26, 26, 0.9)); border: 1px solid var(--border-color); border-radius: 10px; padding: 25px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); }
         .panel h2 { font-family: 'Nosifer', cursive; font-size: 1.4rem; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid; padding-bottom: 10px; position: relative; animation: glitch-skew 1s infinite linear alternate-reverse; }
         .panel h2 i { margin-right: 10px; }
-        .blood-panel { border-color: var(--blood-red); box-shadow: var(--shadow-red); }
+        .blood-panel { border-color: var(--blood-red); box-shadow: var(--shadow-red); grid-column: span 2; }
         .blood-panel h2 { color: var(--blood-red); border-color: var(--blood-red); }
         .dark-panel { border-color: var(--deep-purple); box-shadow: var(--shadow-purple); }
         .dark-panel h2 { color: var(--deep-purple); border-color: var(--deep-purple); }
@@ -528,7 +493,8 @@ HTML_TEMPLATE = """
         .input-group { display: flex; align-items: stretch; gap: 10px; margin-bottom: 15px; }
         .input-group label { color: var(--text-secondary); font-weight: 600; font-family: 'Orbitron', monospace; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); border-right: none; border-radius: 5px 0 0 5px;}
         .input-group input, .input-group textarea, .input-group select { flex-grow: 1; background: rgba(0, 0, 0, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px 15px; border-radius: 0 5px 5px 0; font-family: 'Courier Prime', monospace; }
-        .grab-section { margin-bottom: 15px; padding: 15px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px;}
+        .harvest-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+        .grab-section { padding: 15px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px;}
         .grab-section h3 { color: var(--text-secondary); margin-top:0; margin-bottom: 15px; font-family: 'Orbitron', monospace; text-shadow: 0 0 10px var(--text-secondary); display: flex; justify-content: space-between; align-items: center;}
         .reboot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
         .msg-status { text-align: center; color: var(--shadow-cyan); font-family: 'Courier Prime', monospace; padding: 12px; border: 1px dashed var(--border-color); border-radius: 4px; margin-bottom: 20px; background: rgba(0, 139, 139, 0.1); display: none; }
@@ -541,7 +507,7 @@ HTML_TEMPLATE = """
         .status-badge.inactive { background: var(--dark-red); color: var(--text-secondary); }
         .quick-cmd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; }
         .bot-status-container { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px; }
-        .bot-status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .bot-status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
         .bot-status-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px; background: rgba(0,0,0,0.3); border-radius: 4px; font-family: 'Courier Prime', monospace; border: 1px solid var(--blood-red); }
         .status-indicator { font-weight: 700; text-transform: uppercase; font-size: 0.9em; }
         .status-indicator.online { color: var(--necro-green); } .status-indicator.offline { color: var(--blood-red); }
@@ -564,7 +530,6 @@ HTML_TEMPLATE = """
             <div class="skull-icon">💀</div>
             <h1 class="title"><span class="title-main">KARUTA</span> <span class="title-sub">DEEP</span></h1>
             <p class="subtitle">Shadow Network Control Interface</p>
-            <p class="creepy-subtitle">The Abyss Gazes Back...</p>
         </div>
         
         <div id="msg-status-container" class="msg-status"><i class="fas fa-info-circle"></i> <span id="msg-status-text"></span></div>
@@ -587,9 +552,17 @@ HTML_TEMPLATE = """
 
             <div class="panel blood-panel">
                 <h2 data-text="Soul Harvest"><i class="fas fa-crosshairs"></i> Soul Harvest</h2>
-                <div class="grab-section"><h3>ALPHA NODE <span id="harvest-status-1" class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-1" value="{{ heart_threshold }}" min="0"><button type="button" id="harvest-toggle-1" class="btn {{ grab_button_class }}">{{ grab_action }}</button></div></div>
-                <div class="grab-section"><h3>BETA NODE <span id="harvest-status-2" class="status-badge {{ grab_status_2 }}">{{ grab_text_2 }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-2" value="{{ heart_threshold_2 }}" min="0"><button type="button" id="harvest-toggle-2" class="btn {{ grab_button_class_2 }}">{{ grab_action_2 }}</button></div></div>
-                <div class="grab-section"><h3>GAMMA NODE <span id="harvest-status-3" class="status-badge {{ grab_status_3 }}">{{ grab_text_3 }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-3" value="{{ heart_threshold_3 }}" min="0"><button type="button" id="harvest-toggle-3" class="btn {{ grab_button_class_3 }}">{{ grab_action_3 }}</button></div></div>
+                <div class="harvest-grid">
+                    {% for i, config in main_bot_configs_view.items() %}
+                    <div class="grab-section">
+                        <h3>{{ config.name }} NODE <span id="harvest-status-{{ i }}" class="status-badge {{ config.grab_status }}">{{ config.grab_text }}</span></h3>
+                        <div class="input-group">
+                            <input type="number" id="heart-threshold-{{ i }}" value="{{ config.heart_threshold }}" min="0">
+                            <button type="button" id="harvest-toggle-{{ i }}" class="btn {{ config.grab_button_class }}">{{ config.grab_action }}</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
 
             <div class="panel ops-panel">
@@ -634,9 +607,9 @@ HTML_TEMPLATE = """
                 <hr style="border-color: var(--border-color); margin: 20px 0;">
                 <h3 style="text-align:center; font-family: 'Orbitron';">MANUAL OVERRIDE</h3>
                 <div id="reboot-grid-container" class="reboot-grid" style="margin-top: 15px;">
-                    <button type="button" data-reboot-target="main_1" class="btn btn-necro btn-sm">ALPHA</button>
-                    <button type="button" data-reboot-target="main_2" class="btn btn-necro btn-sm">BETA</button>
-                    <button type="button" data-reboot-target="main_3" class="btn btn-necro btn-sm">GAMMA</button>
+                    {% for i, config in main_bot_configs_view.items() %}
+                    <button type="button" data-reboot-target="main_{{ i }}" class="btn btn-necro btn-sm">{{ config.name }}</button>
+                    {% endfor %}
                     {{ sub_account_buttons|safe }}
                 </div>
                  <button type="button" id="reboot-all-btn" class="btn btn-blood" style="width:100%; margin-top: 15px;">REBOOT ALL SYSTEMS</button>
@@ -686,11 +659,7 @@ HTML_TEMPLATE = """
                 });
                 const result = await response.json();
                 showStatusMessage(result.message);
-
-                setTimeout(() => {
-                    fetchStatus();
-                }, 1000); // 1000ms = 1 giây
-
+                setTimeout(fetchStatus, 1000);
                 return result;
             } catch (error) {
                 console.error('Error posting data:', error);
@@ -734,12 +703,18 @@ HTML_TEMPLATE = """
                 const serverUptimeSeconds = (Date.now() / 1000) - data.server_start_time;
                 updateElement('uptime-timer', { textContent: formatTime(serverUptimeSeconds) });
 
-                updateElement('harvest-toggle-1', { textContent: data.ui_states.grab_action, className: `btn ${data.ui_states.grab_button_class}` });
-                updateElement('harvest-status-1', { textContent: data.ui_states.grab_text, className: `status-badge ${data.ui_states.grab_status}` });
-                updateElement('harvest-toggle-2', { textContent: data.ui_states.grab_action_2, className: `btn ${data.ui_states.grab_button_class_2}` });
-                updateElement('harvest-status-2', { textContent: data.ui_states.grab_text_2, className: `status-badge ${data.ui_states.grab_status_2}` });
-                updateElement('harvest-toggle-3', { textContent: data.ui_states.grab_action_3, className: `btn ${data.ui_states.grab_button_class_3}` });
-                updateElement('harvest-status-3', { textContent: data.ui_states.grab_text_3, className: `status-badge ${data.ui_states.grab_status_3}` });
+                for(let i = 1; i <= 6; i++) {
+                    const toggleBtn = document.getElementById(`harvest-toggle-${i}`);
+                    const statusBadge = document.getElementById(`harvest-status-${i}`);
+                    if(toggleBtn && statusBadge && data.ui_states.main_bots[i]) {
+                        const botState = data.ui_states.main_bots[i];
+                        toggleBtn.textContent = botState.grab_action;
+                        toggleBtn.className = `btn ${botState.grab_button_class}`;
+                        statusBadge.textContent = botState.grab_text;
+                        statusBadge.className = `status-badge ${botState.grab_status}`;
+                    }
+                }
+
                 updateElement('auto-work-toggle-btn', { textContent: `${data.ui_states.work_action} WORK`, className: `btn ${data.ui_states.work_button_class}` });
                 updateElement('auto-daily-toggle-btn', { textContent: `${data.ui_states.daily_action} DAILY`, className: `btn ${data.ui_states.daily_button_class}` });
                 updateElement('auto-reboot-toggle-btn', { textContent: `${data.ui_states.reboot_action} AUTO REBOOT`, className: `btn ${data.ui_states.reboot_button_class}` });
@@ -763,19 +738,17 @@ HTML_TEMPLATE = """
         }
         setInterval(fetchStatus, 1000);
 
-        // --- Event Listeners for Buttons ---
-
-        // Soul Harvest
-        document.getElementById('harvest-toggle-1').addEventListener('click', () => postData('/api/harvest_toggle', { node: 1, threshold: document.getElementById('heart-threshold-1').value }));
-        document.getElementById('harvest-toggle-2').addEventListener('click', () => postData('/api/harvest_toggle', { node: 2, threshold: document.getElementById('heart-threshold-2').value }));
-        document.getElementById('harvest-toggle-3').addEventListener('click', () => postData('/api/harvest_toggle', { node: 3, threshold: document.getElementById('heart-threshold-3').value }));
+        // --- Event Listeners ---
+        for(let i = 1; i <= 6; i++) {
+            const btn = document.getElementById(`harvest-toggle-${i}`);
+            if (btn) {
+                btn.addEventListener('click', () => postData('/api/harvest_toggle', { node: i, threshold: document.getElementById(`heart-threshold-${i}`).value }));
+            }
+        }
         
-        // Manual Operations
         document.getElementById('send-manual-message-btn').addEventListener('click', () => {
             postData('/api/manual_ops', { message: document.getElementById('manual-message-input').value })
-                .then(() => {
-                    document.getElementById('manual-message-input').value = '';
-                });
+                .then(() => { document.getElementById('manual-message-input').value = ''; });
         });
         document.getElementById('quick-cmd-container').addEventListener('click', (e) => {
             if (e.target.matches('button[data-cmd]')) {
@@ -783,7 +756,6 @@ HTML_TEMPLATE = """
             }
         });
 
-        // Code Injection
         document.getElementById('inject-codes-btn').addEventListener('click', () => {
             postData('/api/inject_codes', {
                 acc_index: document.getElementById('inject-acc-index').value,
@@ -796,23 +768,13 @@ HTML_TEMPLATE = """
             });
         });
 
-        // Shadow Labor
         document.getElementById('auto-work-toggle-btn').addEventListener('click', () => {
-            postData('/api/labor_toggle', {
-                type: 'work',
-                delay_between: document.getElementById('work-delay-between-acc').value,
-                delay_after: document.getElementById('work-delay-after-all').value
-            });
+            postData('/api/labor_toggle', { type: 'work', delay_between: document.getElementById('work-delay-between-acc').value, delay_after: document.getElementById('work-delay-after-all').value });
         });
         document.getElementById('auto-daily-toggle-btn').addEventListener('click', () => {
-            postData('/api/labor_toggle', {
-                type: 'daily',
-                delay_between: document.getElementById('daily-delay-between-acc').value,
-                delay_after: document.getElementById('daily-delay-after-all').value
-            });
+            postData('/api/labor_toggle', { type: 'daily', delay_between: document.getElementById('daily-delay-between-acc').value, delay_after: document.getElementById('daily-delay-after-all').value });
         });
 
-        // Shadow Resurrection
         document.getElementById('auto-reboot-toggle-btn').addEventListener('click', () => {
             postData('/api/reboot_toggle_auto', { delay: document.getElementById('auto-reboot-delay').value });
         });
@@ -825,24 +787,13 @@ HTML_TEMPLATE = """
             }
         });
         
-        // Shadow Broadcast
         document.getElementById('spam-toggle-btn').addEventListener('click', () => {
-            postData('/api/broadcast_toggle', {
-                type: 'spam',
-                message: document.getElementById('spam-message').value,
-                delay: document.getElementById('spam-delay').value
-            });
+            postData('/api/broadcast_toggle', { type: 'spam', message: document.getElementById('spam-message').value, delay: document.getElementById('spam-delay').value });
         });
         document.getElementById('auto-kvi-toggle-btn').addEventListener('click', () => {
-             postData('/api/broadcast_toggle', {
-                type: 'kvi',
-                clicks: document.getElementById('kvi-click-count').value,
-                click_delay: document.getElementById('kvi-click-delay').value,
-                loop_delay: document.getElementById('kvi-loop-delay').value
-            });
+             postData('/api/broadcast_toggle', { type: 'kvi', clicks: document.getElementById('kvi-click-count').value, click_delay: document.getElementById('kvi-click-delay').value, loop_delay: document.getElementById('kvi-loop-delay').value });
         });
         
-        // Bot State Toggle (in status list)
         document.getElementById('bot-status-list').addEventListener('click', e => {
             if(e.target.matches('button[data-target]')) {
                 postData('/api/toggle_bot_state', { target: e.target.dataset.target });
@@ -854,29 +805,37 @@ HTML_TEMPLATE = """
 </html>
 """
 
-# --- FLASK ROUTES ---
 @app.route("/")
 def index():
-    # This function is now very simple. It just prepares the data for the initial render.
-    grab_status, grab_text, grab_action, grab_button_class = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled else ("inactive", "OFF", "ENABLE", "btn btn-necro")
-    grab_status_2, grab_text_2, grab_action_2, grab_button_class_2 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_2 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
-    grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_3 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
+    def get_ui_state(enabled): return ("active", "ON", "DISABLE", "btn-blood") if enabled else ("inactive", "OFF", "ENABLE", "btn-necro")
+
+    main_bot_configs_view = {}
+    for i, config in main_bot_configs.items():
+        is_enabled = auto_grab_enabled.get(i, False)
+        status, text, action, btn_class = get_ui_state(is_enabled)
+        main_bot_configs_view[i] = {
+            "name": config["name"],
+            "heart_threshold": heart_threshold.get(i, 50),
+            "grab_status": status,
+            "grab_text": text,
+            "grab_action": action,
+            "grab_button_class": btn_class
+        }
+
     spam_action, spam_button_class = ("DISABLE", "btn-blood") if spam_enabled else ("ENABLE", "btn-necro")
     work_action, work_button_class = ("DISABLE", "btn-blood") if auto_work_enabled else ("ENABLE", "btn-necro")
     daily_action, daily_button_class = ("DISABLE", "btn-blood") if auto_daily_enabled else ("ENABLE", "btn-necro")
     kvi_action, kvi_button_class = ("DISABLE", "btn-blood") if auto_kvi_enabled else ("ENABLE", "btn-necro")
     reboot_action, reboot_button_class = ("DISABLE", "btn-blood") if auto_reboot_enabled else ("ENABLE", "btn-necro")
     
-    acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names[:len(bots)]))
-    if main_bot: acc_options += '<option value="main_1">ALPHA NODE (Main)</option>'
-    if main_bot_2: acc_options += '<option value="main_2">BETA NODE (Main)</option>'
-    if main_bot_3: acc_options += '<option value="main_3">GAMMA NODE (Main)</option>'
+    acc_options = "".join(f'<option value="sub_{i}">{name}</option>' for i, name in enumerate(acc_names[:len(bots)]))
+    for i, config in main_bot_configs.items():
+        acc_options += f'<option value="main_{i}">{config["name"]} NODE (Main)</option>'
+
     sub_account_buttons = "".join(f'<button type="button" data-reboot-target="sub_{i}" class="btn btn-necro btn-sm">{name}</button>' for i, name in enumerate(acc_names[:len(bots)]))
 
-    return render_template_string(HTML_TEMPLATE, 
-        grab_status=grab_status, grab_text=grab_text, grab_action=grab_action, grab_button_class=grab_button_class, heart_threshold=heart_threshold,
-        grab_status_2=grab_status_2, grab_text_2=grab_text_2, grab_action_2=grab_action_2, grab_button_class_2=grab_button_class_2, heart_threshold_2=heart_threshold_2,
-        grab_status_3=grab_status_3, grab_text_3=grab_text_3, grab_action_3=grab_action_3, grab_button_class_3=grab_button_class_3, heart_threshold_3=heart_threshold_3,
+    return render_template_string(HTML_TEMPLATE,
+        main_bot_configs_view=main_bot_configs_view,
         spam_message=spam_message, spam_delay=spam_delay, spam_action=spam_action, spam_button_class=spam_button_class,
         work_delay_between_acc=work_delay_between_acc, work_delay_after_all=work_delay_after_all, work_action=work_action, work_button_class=work_button_class,
         daily_delay_between_acc=daily_delay_between_acc, daily_delay_after_all=daily_delay_after_all, daily_action=daily_action, daily_button_class=daily_button_class,
@@ -885,19 +844,40 @@ def index():
         acc_options=acc_options, sub_account_buttons=sub_account_buttons
     )
 
-# --- API ENDPOINTS ---
 @app.route("/api/harvest_toggle", methods=['POST'])
 def api_harvest_toggle():
-    global auto_grab_enabled, heart_threshold, auto_grab_enabled_2, heart_threshold_2, auto_grab_enabled_3, heart_threshold_3
     data = request.get_json()
     node = data.get('node')
     threshold = int(data.get('threshold', 50))
     msg = ""
-    if node == 1: auto_grab_enabled = not auto_grab_enabled; heart_threshold = threshold; msg = f"Auto Grab 1 was {'ENABLED' if auto_grab_enabled else 'DISABLED'}"
-    elif node == 2: auto_grab_enabled_2 = not auto_grab_enabled_2; heart_threshold_2 = threshold; msg = f"Auto Grab 2 was {'ENABLED' if auto_grab_enabled_2 else 'DISABLED'}"
-    elif node == 3: auto_grab_enabled_3 = not auto_grab_enabled_3; heart_threshold_3 = threshold; msg = f"Auto Grab 3 was {'ENABLED' if auto_grab_enabled_3 else 'DISABLED'}"
+    if node in auto_grab_enabled:
+        auto_grab_enabled[node] = not auto_grab_enabled[node]
+        heart_threshold[node] = threshold
+        msg = f"Auto Grab cho {main_bot_configs[node]['name']} đã {'BẬT' if auto_grab_enabled[node] else 'TẮT'}"
     return jsonify({'status': 'success', 'message': msg})
 
+@app.route("/api/inject_codes", methods=['POST'])
+def api_inject_codes():
+    data = request.get_json()
+    target_id_str, delay_val, prefix, codes_list = data.get("acc_index"), float(data.get("delay", 1.0)), data.get("prefix", ""), [c.strip() for c in data.get("codes", "").split(',') if c.strip()]
+    target_bot, target_name = None, ""
+    
+    if target_id_str.startswith('main_'):
+        bot_num = int(target_id_str.split('_')[1])
+        if bot_num in main_bots:
+            target_bot, target_name = main_bots[bot_num], main_bot_configs[bot_num]["name"]
+    elif target_id_str.startswith('sub_'):
+        acc_idx = int(target_id_str.split('_')[1])
+        if acc_idx < len(bots):
+            target_bot, target_name = bots[acc_idx], acc_names[acc_idx]
+            
+    if target_bot:
+        for i, code in enumerate(codes_list): threading.Timer(delay_val * i, target_bot.sendMessage, args=(other_channel_id, f"{prefix} {code}" if prefix else code)).start()
+        msg = f"Injecting {len(codes_list)} codes to '{target_name}'."
+    else: msg = "Error: Invalid account selected."
+    return jsonify({'status': 'success', 'message': msg})
+
+# Các API endpoints còn lại không thay đổi đáng kể
 @app.route("/api/manual_ops", methods=['POST'])
 def api_manual_ops():
     data = request.get_json()
@@ -911,28 +891,6 @@ def api_manual_ops():
                     threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg_to_send)).start()
     else: msg = "No message provided."
     return jsonify({'status': 'success', 'message': msg})
-
-@app.route("/api/inject_codes", methods=['POST'])
-def api_inject_codes():
-    global main_bot, main_bot_2, main_bot_3, bots
-    try:
-        data = request.get_json()
-        target_id_str, delay_val, prefix, codes_list = data.get("acc_index"), float(data.get("delay", 1.0)), data.get("prefix", ""), [c.strip() for c in data.get("codes", "").split(',') if c.strip()]
-        target_bot, target_name = None, ""
-        if target_id_str == 'main_1': target_bot, target_name = main_bot, "ALPHA NODE (Main)"
-        elif target_id_str == 'main_2': target_bot, target_name = main_bot_2, "BETA NODE (Main)"
-        elif target_id_str == 'main_3': target_bot, target_name = main_bot_3, "GAMMA NODE (Main)"
-        else:
-            acc_idx = int(target_id_str)
-            if acc_idx < len(bots): target_bot, target_name = bots[acc_idx], acc_names[acc_idx]
-        if target_bot:
-            with bots_lock:
-                for i, code in enumerate(codes_list): threading.Timer(delay_val * i, target_bot.sendMessage, args=(other_channel_id, f"{prefix} {code}" if prefix else code)).start()
-            msg = f"Injecting {len(codes_list)} codes to '{target_name}'."
-        else: msg = "Error: Invalid account selected for injection."
-    except Exception as e: msg = f"Code Injection Error: {e}"
-    return jsonify({'status': 'success', 'message': msg})
-
 @app.route("/api/labor_toggle", methods=['POST'])
 def api_labor_toggle():
     global auto_work_enabled, work_delay_between_acc, work_delay_after_all, last_work_cycle_time
@@ -949,31 +907,27 @@ def api_labor_toggle():
         if auto_daily_enabled and last_daily_cycle_time == 0: last_daily_cycle_time = time.time() - daily_delay_after_all - 1
         daily_delay_between_acc = int(data.get('delay_between', 3)); daily_delay_after_all = int(data.get('delay_after', 87000))
         msg = f"Auto Daily {'ENABLED' if auto_daily_enabled else 'DISABLED'}."
-
     return jsonify({'status': 'success', 'message': msg})
-
 @app.route("/api/reboot_manual", methods=['POST'])
 def api_reboot_manual():
     data = request.get_json()
     target = data.get('target')
-    msg = ""
     if target:
-        try:
-            if target == "all": msg = "Rebooting all systems... This may take a while."
-            else:
-                if target.startswith('main_'): bot_name = target.replace('main_','').upper() + " NODE"
-                else: index = int(target.split('_')[1]); bot_name = acc_names[index] if index < len(acc_names) else target
-                msg = f"Rebooting target: {bot_name}"
-        except: msg = f"Rebooting target: {target.upper()}"
         if target == "all":
-            if main_bot: reboot_bot('main_1'); time.sleep(5)
-            if main_bot_2: reboot_bot('main_2'); time.sleep(5)
-            if main_bot_3: reboot_bot('main_3'); time.sleep(5)
+            msg = "Rebooting all systems..."
+            for i in range(1, 7):
+                if main_bot_configs.get(i): reboot_bot(f'main_{i}'); time.sleep(5)
             with bots_lock:
                 for i in range(len(bots)): reboot_bot(f'sub_{i}'); time.sleep(5)
-        else: reboot_bot(target)
+        else:
+            bot_name = target.upper()
+            try:
+                if target.startswith('main_'): bot_name = main_bot_configs[int(target.split('_')[1])]['name']
+                elif target.startswith('sub_'): bot_name = acc_names[int(target.split('_')[1])]
+            except: pass
+            msg = f"Rebooting target: {bot_name}"
+            reboot_bot(target)
     return jsonify({'status': 'success', 'message': msg})
-
 @app.route("/api/reboot_toggle_auto", methods=['POST'])
 def api_reboot_toggle_auto():
     global auto_reboot_enabled, auto_reboot_delay, auto_reboot_thread, auto_reboot_stop_event
@@ -991,9 +945,7 @@ def api_reboot_toggle_auto():
         if auto_reboot_stop_event: auto_reboot_stop_event.set()
         auto_reboot_thread = None
         msg = "Auto Reboot DISABLED."
-
     return jsonify({'status': 'success', 'message': msg})
-
 @app.route("/api/broadcast_toggle", methods=['POST'])
 def api_broadcast_toggle():
     global spam_enabled, spam_message, spam_delay, spam_thread, last_spam_time
@@ -1012,9 +964,7 @@ def api_broadcast_toggle():
         if auto_kvi_enabled and last_kvi_cycle_time == 0: last_kvi_cycle_time = time.time() - kvi_loop_delay - 1
         kvi_click_count, kvi_click_delay, kvi_loop_delay = int(data.get('clicks', 10)), int(data.get('click_delay', 3)), int(data.get('loop_delay', 7500))
         msg = f"Auto KVI {'ENABLED' if auto_kvi_enabled else 'DISABLED'}."
-
     return jsonify({'status': 'success', 'message': msg})
-
 @app.route("/api/toggle_bot_state", methods=['POST'])
 def api_toggle_bot_state():
     data = request.get_json()
@@ -1024,7 +974,6 @@ def api_toggle_bot_state():
         bot_active_states[target] = not bot_active_states[target]
         state_text = "AWAKENED" if bot_active_states[target] else "DORMANT"
         msg = f"Target {target.upper()} has been set to {state_text}."
-
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/status")
@@ -1036,30 +985,33 @@ def status():
     reboot_countdown = (last_reboot_cycle_time + auto_reboot_delay - now) if auto_reboot_enabled else 0
     spam_countdown = (last_spam_time + spam_delay - now) if spam_enabled else 0
 
-    bot_statuses = {
-        "main_bots": [
-            {"name": "ALPHA", "status": main_bot is not None, "reboot_id": "main_1", "is_active": bot_active_states.get('main_1', False), "type": "main"},
-            {"name": "BETA", "status": main_bot_2 is not None, "reboot_id": "main_2", "is_active": bot_active_states.get('main_2', False), "type": "main"},
-            {"name": "GAMMA", "status": main_bot_3 is not None, "reboot_id": "main_3", "is_active": bot_active_states.get('main_3', False), "type": "main"}
-        ],
-        "sub_accounts": []
-    }
+    bot_statuses = {"main_bots": [], "sub_accounts": []}
+    for i, config in main_bot_configs.items():
+        bot_statuses["main_bots"].append({
+            "name": config["name"],
+            "status": i in main_bots,
+            "reboot_id": f"main_{i}",
+            "is_active": bot_active_states.get(f'main_{i}', False),
+            "type": "main"
+        })
     with bots_lock:
         bot_statuses["sub_accounts"] = [
             {"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "status": bot is not None, "reboot_id": f"sub_{i}", "is_active": bot_active_states.get(f'sub_{i}', False), "type": "sub"}
             for i, bot in enumerate(bots)
         ]
     
+    def get_ui_state_dict(enabled_flag): return {"status": "active" if enabled_flag else "inactive", "text": "ON" if enabled_flag else "OFF", "action": "DISABLE" if enabled_flag else "ENABLE", "button_class": "btn-blood" if enabled_flag else "btn-necro"}
+
     ui_states = {
-        "grab_status": "active" if auto_grab_enabled else "inactive", "grab_text": "ON" if auto_grab_enabled else "OFF", "grab_action": "DISABLE" if auto_grab_enabled else "ENABLE", "grab_button_class": "btn-blood" if auto_grab_enabled else "btn-necro",
-        "grab_status_2": "active" if auto_grab_enabled_2 else "inactive", "grab_text_2": "ON" if auto_grab_enabled_2 else "OFF", "grab_action_2": "DISABLE" if auto_grab_enabled_2 else "ENABLE", "grab_button_class_2": "btn-blood" if auto_grab_enabled_2 else "btn-necro",
-        "grab_status_3": "active" if auto_grab_enabled_3 else "inactive", "grab_text_3": "ON" if auto_grab_enabled_3 else "OFF", "grab_action_3": "DISABLE" if auto_grab_enabled_3 else "ENABLE", "grab_button_class_3": "btn-blood" if auto_grab_enabled_3 else "btn-necro",
         "spam_action": "DISABLE" if spam_enabled else "ENABLE", "spam_button_class": "btn-blood" if spam_enabled else "btn-necro",
         "work_action": "DISABLE" if auto_work_enabled else "ENABLE", "work_button_class": "btn-blood" if auto_work_enabled else "btn-necro",
         "daily_action": "DISABLE" if auto_daily_enabled else "ENABLE", "daily_button_class": "btn-blood" if auto_daily_enabled else "btn-necro",
         "kvi_action": "DISABLE" if auto_kvi_enabled else "ENABLE", "kvi_button_class": "btn-blood" if auto_kvi_enabled else "btn-necro",
         "reboot_action": "DISABLE" if auto_reboot_enabled else "ENABLE", "reboot_button_class": "btn-blood" if auto_reboot_enabled else "btn-necro",
+        "main_bots": {}
     }
+    for i in range(1, 7):
+        ui_states["main_bots"][i] = get_ui_state_dict(auto_grab_enabled.get(i, False))
 
     return jsonify({
         'work_enabled': auto_work_enabled, 'work_countdown': work_countdown,
@@ -1077,24 +1029,14 @@ if __name__ == "__main__":
     load_settings()
     print("Đang khởi tạo các bot...", flush=True)
     with bots_lock:
-        if main_token: 
-            main_bot = create_bot(main_token, is_main=True)
-            # THÊM KHỐI NÀY
-            if 'main_1' not in bot_active_states:
-                bot_active_states['main_1'] = True
-                
-        if main_token_2: 
-            main_bot_2 = create_bot(main_token_2, is_main_2=True)
-            # THÊM KHỐI NÀY
-            if 'main_2' not in bot_active_states:
-                bot_active_states['main_2'] = True
-                
-        if main_token_3: 
-            main_bot_3 = create_bot(main_token_3, is_main_3=True)
-            # THÊM KHỐI NÀY
-            if 'main_3' not in bot_active_states:
-                bot_active_states['main_3'] = True
-                
+        # Khởi tạo bot chính
+        for bot_num, config in main_bot_configs.items():
+            print(f"Khởi tạo Main Bot {bot_num} ({config['name']})...", flush=True)
+            main_bots[bot_num] = create_bot(config["token"], bot_number=bot_num)
+            if f'main_{bot_num}' not in bot_active_states:
+                bot_active_states[f'main_{bot_num}'] = True
+
+        # Khởi tạo bot phụ
         for i, token in enumerate(tokens):
             if token.strip():
                 bots.append(create_bot(token.strip()))

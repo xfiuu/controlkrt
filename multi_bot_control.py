@@ -213,7 +213,7 @@ def process_karuta_drop(bot, last_drop_msg_id, channel_id, karibbit_id, ktb_chan
 
     print(f"[{bot_name}] Không tìm thấy hoặc xử lý được tin nhắn Karibbit sau nhiều lần thử.", flush=True)
     
-def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
+def create_bot(token, bot_number=0):  # 0 là giá trị mặc định cho các bot phụ
     bot = discum.Client(token=token, log=False)
     @bot.gateway.command
     def on_ready(resp):
@@ -222,13 +222,14 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
             if isinstance(user_data, dict):
                 user_id = user_data.get("id")
                 if user_id:
-                    if is_main: bot_type = "(ALPHA)"
-                    elif is_main_2: bot_type = "(BETA)"
-                    elif is_main_3: bot_type = "(GAMMA)"
-                    else: bot_type = ""
+                    # Xác định loại bot dựa trên bot_number
+                    if bot_number == 1: bot_type = "(ALPHA)"
+                    elif bot_number == 2: bot_type = "(BETA)"
+                    elif bot_number == 3: bot_type = "(GAMMA)"
+                    else: bot_type = ""  # Bot phụ không có type
                     print(f"Đã đăng nhập: {user_id} {bot_type}", flush=True)
 
-    # Hàm xử lý tin nhắn chung cho các bot chính
+    # Hàm xử lý tin nhắn chung (giữ nguyên từ lần trước)
     def on_message_handler(resp, enabled_flag_func, threshold_func, reaction_config, bot_name):
         if resp.event.message:
             msg = resp.parsed.auto()
@@ -238,31 +239,44 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                 not msg.get("mentions", []) and enabled_flag_func()):
                 
                 last_drop_msg_id = msg["id"]
-                # Gọi hàm xử lý chính trong một luồng mới
                 threading.Thread(target=process_karuta_drop, args=(
                     bot, last_drop_msg_id, main_channel_id, karibbit_id, 
                     ktb_channel_id, threshold_func(), reaction_config, bot_name
                 )).start()
 
-    # Gán hàm xử lý cho từng bot chính với cấu hình tương ứng
-    if is_main:
-        reaction_config_1 = [("1️⃣", 0.5), ("2️⃣", 1.5), ("3️⃣", 2.2)]
+    # Cấu hình riêng cho từng bot chính
+    main_bot_configs = {
+        1: {
+            "enabled_flag_func": lambda: auto_grab_enabled,
+            "threshold_func": lambda: heart_threshold,
+            "reaction_config": [("1️⃣", 0.5), ("2️⃣", 1.5), ("3️⃣", 2.2)],
+            "bot_name": "Bot 1 (ALPHA)"
+        },
+        2: {
+            "enabled_flag_func": lambda: auto_grab_enabled_2,
+            "threshold_func": lambda: heart_threshold_2,
+            "reaction_config": [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)],
+            "bot_name": "Bot 2 (BETA)"
+        },
+        3: {
+            "enabled_flag_func": lambda: auto_grab_enabled_3,
+            "threshold_func": lambda: heart_threshold_3,
+            "reaction_config": [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)],
+            "bot_name": "Bot 3 (GAMMA)"
+        }
+    }
+
+    # Nếu bot_number là của bot chính (1, 2, hoặc 3), thì gán hàm xử lý on_message
+    if bot_number in main_bot_configs:
+        config = main_bot_configs[bot_number]
+        
         @bot.gateway.command
         def on_message(resp):
-            # Dùng lambda để truyền giá trị biến global vào hàm
-            on_message_handler(resp, lambda: auto_grab_enabled, lambda: heart_threshold, reaction_config_1, "Bot 1")
-
-    if is_main_2:
-        reaction_config_2 = [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)]
-        @bot.gateway.command
-        def on_message_2(resp):
-            on_message_handler(resp, lambda: auto_grab_enabled_2, lambda: heart_threshold_2, reaction_config_2, "Bot 2")
-
-    if is_main_3:
-        reaction_config_3 = [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)] # Giả sử cấu hình giống Bot 2
-        @bot.gateway.command
-        def on_message_3(resp):
-            on_message_handler(resp, lambda: auto_grab_enabled_3, lambda: heart_threshold_3, reaction_config_3, "Bot 3")
+            on_message_handler(resp, 
+                               config["enabled_flag_func"], 
+                               config["threshold_func"], 
+                               config["reaction_config"], 
+                               config["bot_name"])
     
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot

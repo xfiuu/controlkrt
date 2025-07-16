@@ -1,4 +1,4 @@
-# PHIÊN BẢN CUỐI CÙNG - REFACTORED (FIX LỖI LOAD SETTINGS & UI)
+# PHIÊN BẢN CUỐI CÙNG - REFACTORED (FIX LỖI GIAO DIỆN)
 import discum
 import threading
 import time
@@ -7,6 +7,7 @@ import random
 import re
 import requests
 import json
+import pprint
 from flask import Flask, request, render_template_string, jsonify
 from dotenv import load_dotenv
 
@@ -323,7 +324,7 @@ def run_kvi_bot(token):
     timeout = time.time() + (kvi_click_count * kvi_click_delay) + 15
     while state["step"] != 2 and time.time() < timeout: time.sleep(0.5)
     bot.gateway.close(); print(f"[KVI] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
-    
+
 # --- CÁC VÒNG LẶP NỀN ---
 def auto_work_loop():
     global last_work_cycle_time
@@ -436,7 +437,6 @@ def periodic_save_loop():
 app = Flask(__name__)
 
 # --- GIAO DIỆN WEB VÀ API ---
-# HTML_TEMPLATE giữ nguyên, chỉ có cách truyền dữ liệu vào là thay đổi
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="vi">
@@ -804,10 +804,13 @@ HTML_TEMPLATE = """
 </html>
 """
 
-# --- FLASK ROUTES ---
 @app.route("/")
 def index():
-    def get_ui_state(enabled): return ("active", "ON", "DISABLE", "btn-blood") if enabled else ("inactive", "OFF", "ENABLE", "btn-necro")
+    def get_ui_state(enabled):
+        if enabled:
+            return "active", "ON", "DISABLE", "btn-blood"
+        else:
+            return "inactive", "OFF", "ENABLE", "btn-necro"
 
     main_bot_configs_view = {}
     for i, config in main_bot_configs.items():
@@ -821,12 +824,17 @@ def index():
             "grab_action": action,
             "grab_button_class": btn_class
         }
+    
+    # DEBUG: In ra context sẽ được render để kiểm tra
+    # print("--- DEBUG: CONTEXT FOR TEMPLATE ---", flush=True)
+    # pprint.pprint(main_bot_configs_view, flush=True)
+    # print("---------------------------------", flush=True)
 
-    spam_action, spam_button_class = ("DISABLE", "btn-blood") if spam_enabled else ("ENABLE", "btn-necro")
-    work_action, work_button_class = ("DISABLE", "btn-blood") if auto_work_enabled else ("ENABLE", "btn-necro")
-    daily_action, daily_button_class = ("DISABLE", "btn-blood") if auto_daily_enabled else ("ENABLE", "btn-necro")
-    kvi_action, kvi_button_class = ("DISABLE", "btn-blood") if auto_kvi_enabled else ("ENABLE", "btn-necro")
-    reboot_action, reboot_button_class = ("DISABLE", "btn-blood") if auto_reboot_enabled else ("ENABLE", "btn-necro")
+    spam_action, spam_button_class = get_ui_state(spam_enabled)[2:]
+    work_action, work_button_class = get_ui_state(auto_work_enabled)[2:]
+    daily_action, daily_button_class = get_ui_state(auto_daily_enabled)[2:]
+    kvi_action, kvi_button_class = get_ui_state(auto_kvi_enabled)[2:]
+    reboot_action, reboot_button_class = get_ui_state(auto_reboot_enabled)[2:]
     
     acc_options = "".join(f'<option value="sub_{i}">{name}</option>' for i, name in enumerate(acc_names[:len(bots)]))
     for i, config in main_bot_configs.items():

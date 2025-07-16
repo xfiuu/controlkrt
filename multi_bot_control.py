@@ -1,4 +1,4 @@
-# PHIÊN BẢN CUỐI CÙNG - THÊM DEBUG LOGS
+# PHIÊN BẢN CUỐI CÙNG - FIX SYNTAXERROR
 import discum
 import threading
 import time
@@ -37,7 +37,7 @@ for i in range(1, 7):
             "name": GREEK_LETTERS.get(i, f"MAIN_{i}")
         }
 
-# --- BIẾN TRẠNG THÁI (THEO PHONG CÁCH GỐC) ---
+# --- BIẾN TRẠNG THÁI ---
 bots, main_bots = [], {}
 acc_names = [
     "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
@@ -160,7 +160,6 @@ def create_bot(token, bot_number=None):
                 bot_type = f"({main_bot_configs[bot_number]['name']})" if bot_number else ""
                 print(f"Đã đăng nhập: {user_id} {bot_type}", flush=True)
 
-    # THÊM LOG GỠ LỖI
     def generic_on_message(bot_instance, channel_id, last_drop_id, heart_val, num, emoji_config):
         try:
             messages = bot_instance.getMessages(channel_id, num=5).json()
@@ -168,22 +167,24 @@ def create_bot(token, bot_number=None):
                 if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
                     desc = msg_item["embeds"][0].get("description", "")
                     lines = desc.split('\n')
-                    print(f"---[DEBUG LOG BOT {num}]---")
-                    print(f"  > Tin nhắn Karibbit tìm thấy: {desc.replace Gỡ lỗi:", flush=True)
+                    
+                    print(f"---[DEBUG LOG BOT {num} CHO DROP {last_drop_id}]---", flush=True)
+                    cleaned_desc = desc.replace('\n', ' ')
+                    print(f"  > [RAW DESC]: {cleaned_desc}", flush=True)
                     
                     heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
-                    print(f"  > Danh sách tim trích xuất được: {heart_numbers}", flush=True)
+                    print(f"  > [EXTRACTED HEARTS]: {heart_numbers}", flush=True)
                     
                     max_num = max(heart_numbers)
-                    print(f"  > Số tim lớn nhất tìm thấy: {max_num}", flush=True)
+                    print(f"  > [MAX HEART]: {max_num}", flush=True)
                     
                     if sum(heart_numbers) > 0 and max_num >= heart_val:
                         max_index = heart_numbers.index(max_num)
-                        print(f"  > Vị trí (index) của tim lớn nhất: {max_index}", flush=True)
+                        print(f"  > [MAX INDEX]: {max_index}", flush=True)
                         
                         emoji, delay = emoji_config[max_index]
-                        print(f"  > QUYẾT ĐỊNH: Nhặt thẻ ở vị trí {max_index+1} với emoji {emoji} sau {delay}s.", flush=True)
-                        print("--------------------------")
+                        print(f"  > [DECISION]: GRAB - Vị trí {max_index+1} | Emoji {emoji} | Delay {delay}s.", flush=True)
+                        print("----------------------------------------------------", flush=True)
                         
                         def grab():
                             bot_instance.addReaction(channel_id, last_drop_id, emoji)
@@ -191,13 +192,13 @@ def create_bot(token, bot_number=None):
                             bot_instance.sendMessage(ktb_channel_id, "kt b")
                         threading.Timer(delay, grab).start()
                     else:
-                        print(f"  > QUYẾT ĐỊNH: Không nhặt thẻ vì số tim lớn nhất ({max_num}) không đạt ngưỡng ({heart_val}).", flush=True)
-                        print("--------------------------")
+                        print(f"  > [DECISION]: SKIP - Max heart ({max_num}) < Threshold ({heart_val}).", flush=True)
+                        print("----------------------------------------------------", flush=True)
                     break
         except Exception as e: 
             print(f"---[DEBUG LOG BOT {num}]---", flush=True)
             print(f"  > Lỗi nghiêm trọng trong hàm generic_on_message: {e}", flush=True)
-            print("--------------------------")
+            print("----------------------------------------------------", flush=True)
 
     if bot_number is not None:
         @bot.gateway.command
@@ -224,8 +225,7 @@ def create_bot(token, bot_number=None):
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
 
-# ... (Các hàm logic phụ và vòng lặp nền không thay đổi) ...
-
+# ... (Các hàm logic phụ và vòng lặp nền không thay đổi, vì chúng đã ổn định) ...
 def run_work_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
     headers = {"Authorization": token, "Content-Type": "application/json"}
@@ -319,7 +319,10 @@ def run_kvi_bot(token):
             time.sleep(kvi_click_delay); click_button(channel_id, message_id, btn["custom_id"], app_id, guild_id); state["click_count"] += 1
             if state["click_count"] >= kvi_click_count: print("[KVI] DONE. Đã click đủ.", flush=True); state["step"] = 2; bot.gateway.close()
     print("[KVI] Bắt đầu...", flush=True); threading.Thread(target=bot.gateway.run, daemon=True).start(); time.sleep(1); bot.sendMessage(kvi_channel_id, "kvi")
-# --- CÁC VÒNG LẶP NỀN ---
+    timeout = time.time() + (kvi_click_count * kvi_click_delay) + 15
+    while state["step"] != 2 and time.time() < timeout: time.sleep(0.5)
+    bot.gateway.close(); print(f"[KVI] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
+    
 def auto_work_loop():
     global last_work_cycle_time
     while True:
@@ -431,6 +434,7 @@ def periodic_save_loop():
 app = Flask(__name__)
 
 # --- GIAO DIỆN WEB VÀ API ---
+# ... (Phần này được giữ nguyên như phiên bản trước) ...
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="vi">
@@ -739,6 +743,7 @@ HTML_TEMPLATE = """
                 const serverUptimeSeconds = (Date.now() / 1000) - data.server_start_time;
                 updateElement('uptime-timer', { textContent: formatTime(serverUptimeSeconds) });
 
+                // Logic to update UI from flat ui_states dictionary
                 for(let i=1; i<=6; i++) {
                     updateElement(`harvest-toggle-${i}`, { textContent: data.ui_states[`grab_action_${i}`], className: `btn ${data.ui_states[`grab_button_class_${i}`]}` });
                     updateElement(`harvest-status-${i}`, { textContent: data.ui_states[`grab_text_${i}`], className: `status-badge ${data.ui_states[`grab_status_${i}`]}` });
@@ -834,6 +839,8 @@ HTML_TEMPLATE = """
 </html>
 """
 
+# ... (Các hàm Flask routes và main execution không thay đổi) ...
+
 @app.route("/")
 def index():
     def get_ui_state(enabled):
@@ -891,6 +898,125 @@ def api_harvest_toggle():
         msg = f"Auto Grab cho Node {node} đã được {state}"
         
     return jsonify({'status': 'success', 'message': msg})
+@app.route("/api/inject_codes", methods=['POST'])
+def api_inject_codes():
+    data = request.get_json()
+    target_id_str = data.get("acc_index", "")
+    delay_val = float(data.get("delay", 1.0))
+    prefix = data.get("prefix", "")
+    codes_list = [c.strip() for c in data.get("codes", "").split(',') if c.strip()]
+    target_bot, target_name = None, "Không xác định"
+    
+    if target_id_str.startswith('main_'):
+        bot_num = int(target_id_str.split('_')[1])
+        if bot_num in main_bots:
+            target_bot, target_name = main_bots[bot_num], main_bot_configs[bot_num]["name"]
+    elif target_id_str.startswith('sub_'):
+        acc_idx = int(target_id_str.split('_')[1])
+        if acc_idx < len(bots):
+            target_bot, target_name = bots[acc_idx], acc_names[acc_idx]
+            
+    if target_bot and codes_list:
+        for i, code in enumerate(codes_list): threading.Timer(delay_val * i, target_bot.sendMessage, args=(other_channel_id, f"{prefix} {code}" if prefix else code)).start()
+        msg = f"Đang inject {len(codes_list)} mã vào '{target_name}'."
+    else: msg = "Lỗi: Vui lòng chọn tài khoản và điền mã."
+    return jsonify({'status': 'success', 'message': msg})
+@app.route("/api/manual_ops", methods=['POST'])
+def api_manual_ops():
+    data = request.get_json()
+    msg = ""
+    msg_to_send = data.get('message') or data.get('quickmsg')
+    if msg_to_send:
+        msg = f"Sent to slaves: {msg_to_send}"
+        with bots_lock:
+            for idx, bot in enumerate(bots): 
+                if bot and bot_active_states.get(f'sub_{idx}', False):
+                    threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg_to_send)).start()
+    else: msg = "No message provided."
+    return jsonify({'status': 'success', 'message': msg})
+@app.route("/api/labor_toggle", methods=['POST'])
+def api_labor_toggle():
+    global auto_work_enabled, work_delay_between_acc, work_delay_after_all, last_work_cycle_time, auto_daily_enabled, daily_delay_between_acc, daily_delay_after_all, last_daily_cycle_time
+    data = request.get_json()
+    msg = ""
+    if data.get('type') == 'work':
+        auto_work_enabled = not auto_work_enabled
+        if auto_work_enabled and last_work_cycle_time == 0: last_work_cycle_time = time.time() - work_delay_after_all - 1
+        work_delay_between_acc = int(data.get('delay_between', 10)); work_delay_after_all = int(data.get('delay_after', 44100))
+        msg = f"Auto Work {'ENABLED' if auto_work_enabled else 'DISABLED'}."
+    elif data.get('type') == 'daily':
+        auto_daily_enabled = not auto_daily_enabled
+        if auto_daily_enabled and last_daily_cycle_time == 0: last_daily_cycle_time = time.time() - daily_delay_after_all - 1
+        daily_delay_between_acc = int(data.get('delay_between', 3)); daily_delay_after_all = int(data.get('delay_after', 87000))
+        msg = f"Auto Daily {'ENABLED' if auto_daily_enabled else 'DISABLED'}."
+    return jsonify({'status': 'success', 'message': msg})
+@app.route("/api/reboot_manual", methods=['POST'])
+def api_reboot_manual():
+    data = request.get_json()
+    target = data.get('target')
+    msg = "Không có target."
+    if target:
+        if target == "all":
+            msg = "Rebooting all systems..."
+            for i in range(1, 7):
+                if main_bot_configs.get(i): reboot_bot(f'main_{i}'); time.sleep(5)
+            with bots_lock:
+                for i in range(len(bots)): reboot_bot(f'sub_{i}'); time.sleep(5)
+        else:
+            bot_name = target.upper()
+            try:
+                if target.startswith('main_'): bot_name = main_bot_configs[int(target.split('_')[1])]['name']
+                elif target.startswith('sub_'): bot_name = acc_names[int(target.split('_')[1])]
+            except: pass
+            msg = f"Rebooting target: {bot_name}"
+            reboot_bot(target)
+    return jsonify({'status': 'success', 'message': msg})
+@app.route("/api/reboot_toggle_auto", methods=['POST'])
+def api_reboot_toggle_auto():
+    global auto_reboot_enabled, auto_reboot_delay, auto_reboot_thread, auto_reboot_stop_event
+    data = request.get_json()
+    auto_reboot_enabled = not auto_reboot_enabled
+    auto_reboot_delay = int(data.get("delay", 3600))
+    msg = ""
+    if auto_reboot_enabled:
+        if auto_reboot_thread is None or not auto_reboot_thread.is_alive():
+            auto_reboot_stop_event = threading.Event()
+            auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True)
+            auto_reboot_thread.start()
+        msg = "Auto Reboot ENABLED."
+    else:
+        if auto_reboot_stop_event: auto_reboot_stop_event.set()
+        auto_reboot_thread = None
+        msg = "Auto Reboot DISABLED."
+    return jsonify({'status': 'success', 'message': msg})
+@app.route("/api/broadcast_toggle", methods=['POST'])
+def api_broadcast_toggle():
+    global spam_enabled, spam_message, spam_delay, spam_thread, last_spam_time, auto_kvi_enabled, kvi_click_count, kvi_click_delay, kvi_loop_delay, last_kvi_cycle_time
+    data = request.get_json()
+    msg = ""
+    if data.get('type') == 'spam':
+        spam_message, spam_delay = data.get("message", "").strip(), int(data.get("delay", 10))
+        if not spam_enabled and spam_message:
+            spam_enabled = True; last_spam_time = time.time(); msg = "Spam ENABLED."
+            if spam_thread is None or not spam_thread.is_alive():
+                spam_thread = threading.Thread(target=spam_loop, daemon=True); spam_thread.start()
+        else: spam_enabled = False; msg = "Spam DISABLED."
+    elif data.get('type') == 'kvi':
+        auto_kvi_enabled = not auto_kvi_enabled
+        if auto_kvi_enabled and last_kvi_cycle_time == 0: last_kvi_cycle_time = time.time() - kvi_loop_delay - 1
+        kvi_click_count = int(data.get('clicks', 10)); kvi_click_delay = int(data.get('click_delay', 3)); kvi_loop_delay = int(data.get('loop_delay', 7500))
+        msg = f"Auto KVI {'ENABLED' if auto_kvi_enabled else 'DISABLED'}."
+    return jsonify({'status': 'success', 'message': msg})
+@app.route("/api/toggle_bot_state", methods=['POST'])
+def api_toggle_bot_state():
+    data = request.get_json()
+    target = data.get('target')
+    msg = ""
+    if target in bot_active_states:
+        bot_active_states[target] = not bot_active_states[target]
+        state_text = "AWAKENED" if bot_active_states[target] else "DORMANT"
+        msg = f"Target {target.upper()} has been set to {state_text}."
+    return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/status")
 def status():
@@ -924,8 +1050,8 @@ def status():
     }
 
     for i in range(1, 7):
-        status, text, action, btn_class = states_map[str(i)]
-        ui_states[f'grab_status_{i}'] = status; ui_states[f'grab_text_{i}'] = text; ui_states[f'grab_action_{i}'] = action; ui_states[f'grab_button_class_{i}'] = btn_class
+        status_val, text_val, action_val, btn_class_val = states_map[str(i)]
+        ui_states[f'grab_status_{i}'] = status_val; ui_states[f'grab_text_{i}'] = text_val; ui_states[f'grab_action_{i}'] = action_val; ui_states[f'grab_button_class_{i}'] = btn_class_val
 
     _, _, ui_states['spam_action'], ui_states['spam_button_class'] = get_ui_state_dict(spam_enabled)
     _, _, ui_states['work_action'], ui_states['work_button_class'] = get_ui_state_dict(auto_work_enabled)

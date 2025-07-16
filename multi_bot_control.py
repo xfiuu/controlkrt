@@ -1,4 +1,4 @@
-# PHIÊN BẢN CUỐI CÙNG - REFACTORED (FIX LỖI LOAD SETTINGS)
+# PHIÊN BẢN CUỐI CÙNG - REFACTORED (FIX LỖI LOAD SETTINGS & UI)
 import discum
 import threading
 import time
@@ -95,9 +95,7 @@ def save_settings():
         else: print(f"[Settings] Lỗi khi lưu cài đặt: {req.status_code} - {req.text}", flush=True)
     except Exception as e: print(f"[Settings] Exception khi lưu cài đặt: {e}", flush=True)
 
-# SỬA LỖI: Viết lại hoàn toàn hàm load_settings để tránh xung đột kiểu dữ liệu
 def load_settings():
-    """Tải cài đặt từ JSONBin.io một cách an toàn."""
     api_key, bin_id = os.getenv("JSONBIN_API_KEY"), os.getenv("JSONBIN_BIN_ID")
     if not api_key or not bin_id:
         print("[Settings] Thiếu API Key/Bin ID, dùng cài đặt mặc định.", flush=True)
@@ -112,7 +110,6 @@ def load_settings():
             if settings:
                 global spam_enabled, spam_message, spam_delay, auto_work_enabled, work_delay_between_acc, work_delay_after_all, auto_daily_enabled, daily_delay_between_acc, daily_delay_after_all, auto_kvi_enabled, kvi_click_count, kvi_click_delay, kvi_loop_delay, auto_reboot_enabled, auto_reboot_delay, bot_active_states, last_work_cycle_time, last_daily_cycle_time, last_kvi_cycle_time, last_reboot_cycle_time, last_spam_time
                 
-                # Load các giá trị một cách an toàn, có giá trị mặc định
                 spam_enabled = settings.get('spam_enabled', False)
                 spam_message = settings.get('spam_message', "")
                 spam_delay = settings.get('spam_delay', 10)
@@ -135,7 +132,6 @@ def load_settings():
                 last_reboot_cycle_time = settings.get('last_reboot_cycle_time', 0)
                 last_spam_time = settings.get('last_spam_time', 0)
                 
-                # Load cài đặt cho các bot chính vào dictionary
                 for i in range(1, 7):
                     auto_grab_enabled[i] = settings.get(f'auto_grab_enabled_{i}', False)
                     heart_threshold[i] = settings.get(f'heart_threshold_{i}', 50)
@@ -230,8 +226,6 @@ def create_bot(token, bot_number=None):
 
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
-
-# ... (Các hàm run_work_bot, run_daily_bot, run_kvi_bot không thay đổi) ...
 
 def run_work_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
@@ -329,11 +323,8 @@ def run_kvi_bot(token):
     timeout = time.time() + (kvi_click_count * kvi_click_delay) + 15
     while state["step"] != 2 and time.time() < timeout: time.sleep(0.5)
     bot.gateway.close(); print(f"[KVI] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
-
+    
 # --- CÁC VÒNG LẶP NỀN ---
-# ... (auto_work_loop, auto_daily_loop, etc. không thay đổi) ...
-# --- Các vòng lặp nền và web server (giữ nguyên như phiên bản trước) ---
-
 def auto_work_loop():
     global last_work_cycle_time
     while True:
@@ -443,7 +434,9 @@ def periodic_save_loop():
         save_settings()
 
 app = Flask(__name__)
-# HTML TEMPLATE được giữ nguyên như phiên bản trước, chỉ có phần render context là thay đổi
+
+# --- GIAO DIỆN WEB VÀ API ---
+# HTML_TEMPLATE giữ nguyên, chỉ có cách truyền dữ liệu vào là thay đổi
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="vi">
@@ -707,10 +700,10 @@ HTML_TEMPLATE = """
                 const serverUptimeSeconds = (Date.now() / 1000) - data.server_start_time;
                 updateElement('uptime-timer', { textContent: formatTime(serverUptimeSeconds) });
 
-                for(let i = 1; i <= 6; i++) {
+                for(const i in data.ui_states.main_bots) {
                     const toggleBtn = document.getElementById(`harvest-toggle-${i}`);
                     const statusBadge = document.getElementById(`harvest-status-${i}`);
-                    if(toggleBtn && statusBadge && data.ui_states.main_bots[i]) {
+                    if(toggleBtn && statusBadge) {
                         const botState = data.ui_states.main_bots[i];
                         toggleBtn.textContent = botState.grab_action;
                         toggleBtn.className = `btn ${botState.grab_button_class}`;
@@ -743,12 +736,14 @@ HTML_TEMPLATE = """
         setInterval(fetchStatus, 1000);
 
         // --- Event Listeners ---
-        for(let i = 1; i <= 6; i++) {
-            const btn = document.getElementById(`harvest-toggle-${i}`);
-            if (btn) {
-                btn.addEventListener('click', () => postData('/api/harvest_toggle', { node: i, threshold: document.getElementById(`heart-threshold-${i}`).value }));
+        document.querySelectorAll('.harvest-grid .grab-section').forEach(section => {
+            const button = section.querySelector('button');
+            const input = section.querySelector('input');
+            if (button && input) {
+                const i = button.id.split('-').pop();
+                button.addEventListener('click', () => postData('/api/harvest_toggle', { node: parseInt(i), threshold: input.value }));
             }
-        }
+        });
         
         document.getElementById('send-manual-message-btn').addEventListener('click', () => {
             postData('/api/manual_ops', { message: document.getElementById('manual-message-input').value })
@@ -808,7 +803,8 @@ HTML_TEMPLATE = """
 </body>
 </html>
 """
-# Flask routes
+
+# --- FLASK ROUTES ---
 @app.route("/")
 def index():
     def get_ui_state(enabled): return ("active", "ON", "DISABLE", "btn-blood") if enabled else ("inactive", "OFF", "ENABLE", "btn-necro")
@@ -883,8 +879,6 @@ def api_inject_codes():
         msg = f"Đang inject {len(codes_list)} mã vào '{target_name}'."
     else: msg = "Lỗi: Vui lòng chọn tài khoản và điền mã."
     return jsonify({'status': 'success', 'message': msg})
-
-# ... (Các API endpoints khác không thay đổi) ...
 
 @app.route("/api/manual_ops", methods=['POST'])
 def api_manual_ops():
@@ -1018,7 +1012,7 @@ def status():
         "reboot_action": "DISABLE" if auto_reboot_enabled else "ENABLE", "reboot_button_class": "btn-blood" if auto_reboot_enabled else "btn-necro",
         "main_bots": {}
     }
-    for i in range(1, 7):
+    for i in main_bot_configs.keys():
         ui_states["main_bots"][i] = get_ui_state_dict(auto_grab_enabled.get(i, False))
 
     return jsonify({

@@ -1,4 +1,4 @@
-# PHIÊN BẢN CUỐI CÙNG - FINAL HYBRID (FIX GIAO DIỆN)
+# PHIÊN BẢN CUỐI CÙNG - FINAL HYBRID (FIX GIAO DIỆN & LOAD SETTINGS)
 import discum
 import threading
 import time
@@ -7,7 +7,6 @@ import random
 import re
 import requests
 import json
-import pprint
 from flask import Flask, request, render_template_string, jsonify
 from dotenv import load_dotenv
 
@@ -45,7 +44,6 @@ acc_names = [
     "Ylang", "Nina", "Nathan", "Ofer", "White", "the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Token",
 ]
 
-# Hoàn nguyên về các biến riêng lẻ cho từng bot chính để đảm bảo tương thích
 auto_grab_enabled_1, auto_grab_enabled_2, auto_grab_enabled_3, auto_grab_enabled_4, auto_grab_enabled_5, auto_grab_enabled_6 = False, False, False, False, False, False
 heart_threshold_1, heart_threshold_2, heart_threshold_3, heart_threshold_4, heart_threshold_5, heart_threshold_6 = 50, 50, 50, 50, 50, 50
 
@@ -113,7 +111,38 @@ def load_settings():
         if req.status_code == 200:
             settings = req.json().get("record", {})
             if settings:
-                globals().update(settings)
+                global auto_grab_enabled_1, heart_threshold_1, auto_grab_enabled_2, heart_threshold_2, auto_grab_enabled_3, heart_threshold_3, auto_grab_enabled_4, heart_threshold_4, auto_grab_enabled_5, heart_threshold_5, auto_grab_enabled_6, heart_threshold_6
+                global spam_enabled, spam_message, spam_delay, auto_work_enabled, work_delay_between_acc, work_delay_after_all, auto_daily_enabled, daily_delay_between_acc, daily_delay_after_all, auto_kvi_enabled, kvi_click_count, kvi_click_delay, kvi_loop_delay, auto_reboot_enabled, auto_reboot_delay, bot_active_states, last_work_cycle_time, last_daily_cycle_time, last_kvi_cycle_time, last_reboot_cycle_time, last_spam_time
+                
+                # Nạp an toàn từng giá trị
+                auto_grab_enabled_1 = settings.get('auto_grab_enabled_1', False); heart_threshold_1 = settings.get('heart_threshold_1', 50)
+                auto_grab_enabled_2 = settings.get('auto_grab_enabled_2', False); heart_threshold_2 = settings.get('heart_threshold_2', 50)
+                auto_grab_enabled_3 = settings.get('auto_grab_enabled_3', False); heart_threshold_3 = settings.get('heart_threshold_3', 50)
+                auto_grab_enabled_4 = settings.get('auto_grab_enabled_4', False); heart_threshold_4 = settings.get('heart_threshold_4', 50)
+                auto_grab_enabled_5 = settings.get('auto_grab_enabled_5', False); heart_threshold_5 = settings.get('heart_threshold_5', 50)
+                auto_grab_enabled_6 = settings.get('auto_grab_enabled_6', False); heart_threshold_6 = settings.get('heart_threshold_6', 50)
+
+                spam_enabled = settings.get('spam_enabled', False)
+                spam_message = settings.get('spam_message', "")
+                spam_delay = settings.get('spam_delay', 10)
+                auto_work_enabled = settings.get('auto_work_enabled', False)
+                work_delay_between_acc = settings.get('work_delay_between_acc', 10)
+                work_delay_after_all = settings.get('work_delay_after_all', 44100)
+                auto_daily_enabled = settings.get('auto_daily_enabled', False)
+                daily_delay_between_acc = settings.get('daily_delay_between_acc', 3)
+                daily_delay_after_all = settings.get('daily_delay_after_all', 87000)
+                auto_kvi_enabled = settings.get('auto_kvi_enabled', False)
+                kvi_click_count = settings.get('kvi_click_count', 10)
+                kvi_click_delay = settings.get('kvi_click_delay', 3)
+                kvi_loop_delay = settings.get('kvi_loop_delay', 7500)
+                auto_reboot_enabled = settings.get('auto_reboot_enabled', False)
+                auto_reboot_delay = settings.get('auto_reboot_delay', 3600)
+                bot_active_states = settings.get('bot_active_states', {})
+                last_work_cycle_time = settings.get('last_work_cycle_time', 0)
+                last_daily_cycle_time = settings.get('last_daily_cycle_time', 0)
+                last_kvi_cycle_time = settings.get('last_kvi_cycle_time', 0)
+                last_reboot_cycle_time = settings.get('last_reboot_cycle_time', 0)
+                last_spam_time = settings.get('last_spam_time', 0)
                 print("[Settings] Đã tải cài đặt từ JSONBin.io.", flush=True)
             else:
                 print("[Settings] JSONBin rỗng, bắt đầu với cài đặt mặc định và lưu lại.", flush=True)
@@ -722,7 +751,6 @@ HTML_TEMPLATE = """
                 const serverUptimeSeconds = (Date.now() / 1000) - data.server_start_time;
                 updateElement('uptime-timer', { textContent: formatTime(serverUptimeSeconds) });
 
-                // Logic to update UI from flat ui_states dictionary
                 for(let i=1; i<=6; i++) {
                     updateElement(`harvest-toggle-${i}`, { textContent: data.ui_states[`grab_action_${i}`], className: `btn ${data.ui_states[`grab_button_class_${i}`]}` });
                     updateElement(`harvest-status-${i}`, { textContent: data.ui_states[`grab_text_${i}`], className: `status-badge ${data.ui_states[`grab_status_${i}`]}` });
@@ -818,7 +846,6 @@ HTML_TEMPLATE = """
 </html>
 """
 
-# --- FLASK ROUTES ---
 @app.route("/")
 def index():
     def get_ui_state(enabled):
@@ -831,11 +858,11 @@ def index():
     grab_status_5, grab_text_5, grab_action_5, grab_button_class_5 = get_ui_state(auto_grab_enabled_5)
     grab_status_6, grab_text_6, grab_action_6, grab_button_class_6 = get_ui_state(auto_grab_enabled_6)
     
-    spam_status, _, spam_action, spam_button_class = get_ui_state(spam_enabled)
-    work_status, _, work_action, work_button_class = get_ui_state(auto_work_enabled)
-    daily_status, _, daily_action, daily_button_class = get_ui_state(auto_daily_enabled)
-    kvi_status, _, kvi_action, kvi_button_class = get_ui_state(auto_kvi_enabled)
-    reboot_status, _, reboot_action, reboot_button_class = get_ui_state(auto_reboot_enabled)
+    _, _, spam_action, spam_button_class = get_ui_state(spam_enabled)
+    _, _, work_action, work_button_class = get_ui_state(auto_work_enabled)
+    _, _, daily_action, daily_button_class = get_ui_state(auto_daily_enabled)
+    _, _, kvi_action, kvi_button_class = get_ui_state(auto_kvi_enabled)
+    _, _, reboot_action, reboot_button_class = get_ui_state(auto_reboot_enabled)
     
     acc_options = "".join(f'<option value="sub_{i}">{name}</option>' for i, name in enumerate(acc_names[:len(bots)]))
     for i, config in main_bot_configs.items():
@@ -866,7 +893,6 @@ def api_harvest_toggle():
     threshold = int(data.get('threshold', 50))
     msg = f"Node {node} không hợp lệ."
     
-    # Dùng globals() để truy cập và thay đổi biến động
     enabled_var = f'auto_grab_enabled_{node}'
     threshold_var = f'heart_threshold_{node}'
     
@@ -876,132 +902,6 @@ def api_harvest_toggle():
         state = "BẬT" if globals()[enabled_var] else "TẮT"
         msg = f"Auto Grab cho Node {node} đã được {state}"
         
-    return jsonify({'status': 'success', 'message': msg})
-
-@app.route("/api/inject_codes", methods=['POST'])
-def api_inject_codes():
-    data = request.get_json()
-    target_id_str = data.get("acc_index", "")
-    delay_val = float(data.get("delay", 1.0))
-    prefix = data.get("prefix", "")
-    codes_list = [c.strip() for c in data.get("codes", "").split(',') if c.strip()]
-    target_bot, target_name = None, "Không xác định"
-    
-    if target_id_str.startswith('main_'):
-        bot_num = int(target_id_str.split('_')[1])
-        if bot_num in main_bots:
-            target_bot, target_name = main_bots[bot_num], main_bot_configs[bot_num]["name"]
-    elif target_id_str.startswith('sub_'):
-        acc_idx = int(target_id_str.split('_')[1])
-        if acc_idx < len(bots):
-            target_bot, target_name = bots[acc_idx], acc_names[acc_idx]
-            
-    if target_bot and codes_list:
-        for i, code in enumerate(codes_list): threading.Timer(delay_val * i, target_bot.sendMessage, args=(other_channel_id, f"{prefix} {code}" if prefix else code)).start()
-        msg = f"Đang inject {len(codes_list)} mã vào '{target_name}'."
-    else: msg = "Lỗi: Vui lòng chọn tài khoản và điền mã."
-    return jsonify({'status': 'success', 'message': msg})
-
-@app.route("/api/manual_ops", methods=['POST'])
-def api_manual_ops():
-    data = request.get_json()
-    msg = ""
-    msg_to_send = data.get('message') or data.get('quickmsg')
-    if msg_to_send:
-        msg = f"Sent to slaves: {msg_to_send}"
-        with bots_lock:
-            for idx, bot in enumerate(bots): 
-                if bot and bot_active_states.get(f'sub_{idx}', False):
-                    threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg_to_send)).start()
-    else: msg = "No message provided."
-    return jsonify({'status': 'success', 'message': msg})
-
-@app.route("/api/labor_toggle", methods=['POST'])
-def api_labor_toggle():
-    global auto_work_enabled, work_delay_between_acc, work_delay_after_all, last_work_cycle_time, auto_daily_enabled, daily_delay_between_acc, daily_delay_after_all, last_daily_cycle_time
-    data = request.get_json()
-    msg = ""
-    if data.get('type') == 'work':
-        auto_work_enabled = not auto_work_enabled
-        if auto_work_enabled and last_work_cycle_time == 0: last_work_cycle_time = time.time() - work_delay_after_all - 1
-        work_delay_between_acc = int(data.get('delay_between', 10)); work_delay_after_all = int(data.get('delay_after', 44100))
-        msg = f"Auto Work {'ENABLED' if auto_work_enabled else 'DISABLED'}."
-    elif data.get('type') == 'daily':
-        auto_daily_enabled = not auto_daily_enabled
-        if auto_daily_enabled and last_daily_cycle_time == 0: last_daily_cycle_time = time.time() - daily_delay_after_all - 1
-        daily_delay_between_acc = int(data.get('delay_between', 3)); daily_delay_after_all = int(data.get('delay_after', 87000))
-        msg = f"Auto Daily {'ENABLED' if auto_daily_enabled else 'DISABLED'}."
-    return jsonify({'status': 'success', 'message': msg})
-
-@app.route("/api/reboot_manual", methods=['POST'])
-def api_reboot_manual():
-    data = request.get_json()
-    target = data.get('target')
-    msg = "Không có target."
-    if target:
-        if target == "all":
-            msg = "Rebooting all systems..."
-            for i in range(1, 7):
-                if main_bot_configs.get(i): reboot_bot(f'main_{i}'); time.sleep(5)
-            with bots_lock:
-                for i in range(len(bots)): reboot_bot(f'sub_{i}'); time.sleep(5)
-        else:
-            bot_name = target.upper()
-            try:
-                if target.startswith('main_'): bot_name = main_bot_configs[int(target.split('_')[1])]['name']
-                elif target.startswith('sub_'): bot_name = acc_names[int(target.split('_')[1])]
-            except: pass
-            msg = f"Rebooting target: {bot_name}"
-            reboot_bot(target)
-    return jsonify({'status': 'success', 'message': msg})
-
-@app.route("/api/reboot_toggle_auto", methods=['POST'])
-def api_reboot_toggle_auto():
-    global auto_reboot_enabled, auto_reboot_delay, auto_reboot_thread, auto_reboot_stop_event
-    data = request.get_json()
-    auto_reboot_enabled = not auto_reboot_enabled
-    auto_reboot_delay = int(data.get("delay", 3600))
-    msg = ""
-    if auto_reboot_enabled:
-        if auto_reboot_thread is None or not auto_reboot_thread.is_alive():
-            auto_reboot_stop_event = threading.Event()
-            auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True)
-            auto_reboot_thread.start()
-        msg = "Auto Reboot ENABLED."
-    else:
-        if auto_reboot_stop_event: auto_reboot_stop_event.set()
-        auto_reboot_thread = None
-        msg = "Auto Reboot DISABLED."
-    return jsonify({'status': 'success', 'message': msg})
-
-@app.route("/api/broadcast_toggle", methods=['POST'])
-def api_broadcast_toggle():
-    global spam_enabled, spam_message, spam_delay, spam_thread, last_spam_time, auto_kvi_enabled, kvi_click_count, kvi_click_delay, kvi_loop_delay, last_kvi_cycle_time
-    data = request.get_json()
-    msg = ""
-    if data.get('type') == 'spam':
-        spam_message, spam_delay = data.get("message", "").strip(), int(data.get("delay", 10))
-        if not spam_enabled and spam_message:
-            spam_enabled = True; last_spam_time = time.time(); msg = "Spam ENABLED."
-            if spam_thread is None or not spam_thread.is_alive():
-                spam_thread = threading.Thread(target=spam_loop, daemon=True); spam_thread.start()
-        else: spam_enabled = False; msg = "Spam DISABLED."
-    elif data.get('type') == 'kvi':
-        auto_kvi_enabled = not auto_kvi_enabled
-        if auto_kvi_enabled and last_kvi_cycle_time == 0: last_kvi_cycle_time = time.time() - kvi_loop_delay - 1
-        kvi_click_count = int(data.get('clicks', 10)); kvi_click_delay = int(data.get('click_delay', 3)); kvi_loop_delay = int(data.get('loop_delay', 7500))
-        msg = f"Auto KVI {'ENABLED' if auto_kvi_enabled else 'DISABLED'}."
-    return jsonify({'status': 'success', 'message': msg})
-
-@app.route("/api/toggle_bot_state", methods=['POST'])
-def api_toggle_bot_state():
-    data = request.get_json()
-    target = data.get('target')
-    msg = ""
-    if target in bot_active_states:
-        bot_active_states[target] = not bot_active_states[target]
-        state_text = "AWAKENED" if bot_active_states[target] else "DORMANT"
-        msg = f"Target {target.upper()} has been set to {state_text}."
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/status")
@@ -1030,16 +930,14 @@ def status():
 
     ui_states = {}
     states_map = {
-        '1': get_ui_state_dict(auto_grab_enabled_1),
-        '2': get_ui_state_dict(auto_grab_enabled_2),
-        '3': get_ui_state_dict(auto_grab_enabled_3),
-        '4': get_ui_state_dict(auto_grab_enabled_4),
-        '5': get_ui_state_dict(auto_grab_enabled_5),
-        '6': get_ui_state_dict(auto_grab_enabled_6),
+        '1': get_ui_state_dict(auto_grab_enabled_1), '2': get_ui_state_dict(auto_grab_enabled_2),
+        '3': get_ui_state_dict(auto_grab_enabled_3), '4': get_ui_state_dict(auto_grab_enabled_4),
+        '5': get_ui_state_dict(auto_grab_enabled_5), '6': get_ui_state_dict(auto_grab_enabled_6),
     }
 
     for i in range(1, 7):
-        ui_states[f'grab_status_{i}'], ui_states[f'grab_text_{i}'], ui_states[f'grab_action_{i}'], ui_states[f'grab_button_class_{i}'] = states_map[str(i)]
+        status, text, action, btn_class = states_map[str(i)]
+        ui_states[f'grab_status_{i}'] = status; ui_states[f'grab_text_{i}'] = text; ui_states[f'grab_action_{i}'] = action; ui_states[f'grab_button_class_{i}'] = btn_class
 
     _, _, ui_states['spam_action'], ui_states['spam_button_class'] = get_ui_state_dict(spam_enabled)
     _, _, ui_states['work_action'], ui_states['work_button_class'] = get_ui_state_dict(auto_work_enabled)

@@ -342,8 +342,8 @@ async def handle_grab(bot, msg, bot_num):
             target_message = await msg.channel.fetch_message(msg.id)
             for reaction in target_message.reactions:
                 emoji_name = reaction.emoji if isinstance(reaction.emoji, str) else reaction.emoji.name
-                if '🍉' in emoji_name:
-                    await target_message.add_reaction("🍉")
+                if '🍬' in emoji_name:
+                    await target_message.add_reaction("🍬")
                     print(f"[GRAB CTRL | Bot {bot_num}] ✅ NHẶT DƯA THÀNH CÔNG!", flush=True)
                     break 
         except Exception as e:

@@ -730,8 +730,6 @@ def initialize_and_run_bot(token, bot_id_str, is_main, ready_event=None):
         async def on_message(msg, bot_num=bot_identifier):
             try:
                 if msg.author.id == int(karuta_id) and "dropping" in msg.content.lower():
-                    is_clan_drop = bool(msg.mentions) 
-                    handler = handle_clan_drop if is_clan_drop else handle_grab
                     await handler(bot, msg, bot_num)
             except Exception as e:
                 print(f"[Bot] ❌ Error in on_message for {bot_id_str} (Bot {bot_num}): {e}\n{traceback.format_exc()}", flush=True)

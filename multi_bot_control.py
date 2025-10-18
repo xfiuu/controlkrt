@@ -335,19 +335,29 @@ async def handle_grab(bot, msg, bot_num):
 
     if watermelon_grab_enabled:
         wait_for_watermelon_duration = max(0, 5.0 - time_spent_searching)
-        #print(f"[GRAB CTRL | Bot {bot_num}] Chờ thêm {wait_for_watermelon_duration:.1f}s để canh dưa...", flush=True)
         await asyncio.sleep(wait_for_watermelon_duration)
         
         try:
             target_message = await msg.channel.fetch_message(msg.id)
+            
+            # Danh sách các emoji muốn nhặt
+            emojis_to_grab = ['🍬', '🍫']
+            found_emoji_to_add = None
+
+            # Tìm xem có emoji nào trong danh sách xuất hiện không
             for reaction in target_message.reactions:
                 emoji_name = reaction.emoji if isinstance(reaction.emoji, str) else reaction.emoji.name
-                if '🍬' in emoji_name:
-                    await target_message.add_reaction("🍬")
-                    print(f"[GRAB CTRL | Bot {bot_num}] ✅ NHẶT DƯA THÀNH CÔNG!", flush=True)
-                    break 
+                if emoji_name in emojis_to_grab:
+                    found_emoji_to_add = emoji_name # Lưu lại emoji đã tìm thấy
+                    break # Thoát ngay khi tìm thấy 1 emoji hợp lệ
+
+            # Nếu đã tìm thấy, thả reaction tương ứng
+            if found_emoji_to_add:
+                await target_message.add_reaction(found_emoji_to_add)
+                print(f"[GRAB CTRL | Bot {bot_num}] ✅ NHẶT EMOJI '{found_emoji_to_add}' THÀNH CÔNG!", flush=True)
+                
         except Exception as e:
-            print(f"[GRAB CTRL | Bot {bot_num}] ❌ Lỗi khi nhặt dưa: {e}", flush=True)
+            print(f"[GRAB CTRL | Bot {bot_num}] ❌ Lỗi khi nhặt emoji: {e}", flush=True)
 
     if card_to_grab:
         emoji_to_add, reaction_delay = card_to_grab
@@ -732,10 +742,8 @@ def initialize_and_run_bot(token, bot_id_str, is_main, ready_event=None):
                 # Kiểm tra tin nhắn drop từ Karuta
                 if msg.author.id == int(karuta_id) and "dropping" in msg.content.lower():
                     
-                    # --- THAY ĐỔI QUAN TRỌNG ---
-                    # Logic cũ (phân biệt drop thường và clan) đã được xóa.
-                    # Bây giờ, tất cả các loại drop (có mention hay không) 
-                    # sẽ đều được xử lý bằng hàm handle_grab.
+                    # --- THAY ĐỔI: Gộp logic nhặt thẻ ---
+                    # Tất cả drop (có mention hay không) sẽ được xử lý bằng handle_grab.
                     await handle_grab(bot, msg, bot_num)
 
             except Exception as e:

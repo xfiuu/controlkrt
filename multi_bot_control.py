@@ -729,11 +729,18 @@ def initialize_and_run_bot(token, bot_id_str, is_main, ready_event=None):
         @bot.event
         async def on_message(msg, bot_num=bot_identifier):
             try:
+                # Kiểm tra tin nhắn drop từ Karuta
                 if msg.author.id == int(karuta_id) and "dropping" in msg.content.lower():
-                    await handler(bot, msg, bot_num)
+                    
+                    # --- THAY ĐỔI QUAN TRỌNG ---
+                    # Logic cũ (phân biệt drop thường và clan) đã được xóa.
+                    # Bây giờ, tất cả các loại drop (có mention hay không) 
+                    # sẽ đều được xử lý bằng hàm handle_grab.
+                    await handle_grab(bot, msg, bot_num)
+
             except Exception as e:
                 print(f"[Bot] ❌ Error in on_message for {bot_id_str} (Bot {bot_num}): {e}\n{traceback.format_exc()}", flush=True)
-    
+
     try:
         bot_manager.add_bot(bot_id_str, {'instance': bot, 'loop': loop, 'thread': threading.current_thread()})
         loop.run_until_complete(bot.start(token))

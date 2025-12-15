@@ -341,7 +341,7 @@ async def handle_grab(bot, msg, bot_num):
             target_message = await msg.channel.fetch_message(msg.id)
             
             # Danh sách các emoji muốn nhặt
-            emojis_to_grab = ['🍬', '🍫']
+            emojis_to_grab = ['🎀', '🍫']
             found_emoji_to_add = None
 
             # Tìm xem có emoji nào trong danh sách xuất hiện không
